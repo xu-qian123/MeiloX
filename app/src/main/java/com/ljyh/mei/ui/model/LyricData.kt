@@ -9,7 +9,11 @@ data class LyricData(
     val isVerbatim: Boolean = false,
     val isPureMusic: Boolean = false,
     val source: LyricSource = LyricSource.Empty,
-    val lyricLine: SyncedLyrics
+    val lyricLine: SyncedLyrics,
+    /** Raw text of the lyric source, when known. Used by the lyrics editor. */
+    val rawLyrics: String? = null,
+    /** Raw translation text of the lyric source, when known. */
+    val rawTranslation: String? = null,
 )
 
 
@@ -29,5 +33,7 @@ enum class LyricSource {
     NetEaseCloudMusic,
     QQMusic,
     AM,
+    Custom,
+    Kugou,
     Loading
 }

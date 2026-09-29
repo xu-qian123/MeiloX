@@ -104,6 +104,20 @@ class PlayerOverlayHandler(
     }
 
     /**
+     * 显示歌词编辑弹窗
+     */
+    fun showLyricsEditor(mediaMetadata: MediaMetadata) {
+        _currentOverlay.value = OverlayState.LyricsEditor(mediaMetadata)
+    }
+
+    /**
+     * 显示多源歌词搜索弹窗
+     */
+    fun showLyricMatch(mediaMetadata: MediaMetadata) {
+        _currentOverlay.value = OverlayState.LyricMatch(mediaMetadata)
+    }
+
+    /**
      * 显示音质选择弹窗
      */
     fun showMusicQualitySelection(current: Int) {
@@ -169,6 +183,9 @@ class PlayerOverlayHandler(
             MoreAction.PICTURE_IN_PICTURE -> {
                 dismiss()
                 enterFloatingLyricsPip(context, stateContainer.isPlaying.value)
+            }
+            MoreAction.EDIT_LYRICS -> {
+                mediaMetadata?.let { showLyricsEditor(it) }
             }
             MoreAction.BOTTOM_ACTION -> {
                 showBottomAction()

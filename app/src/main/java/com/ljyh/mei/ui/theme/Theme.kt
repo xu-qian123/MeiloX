@@ -15,15 +15,14 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.capsule.ContinuousRoundedRectangle
-import com.ljyh.mei.R
 
-private val SfProFamily = FontFamily(Font(R.font.sf_pro, FontWeight.Normal))
+/** Text now follows the platform font; the bundled SF Pro file stays for SF Symbols icons. */
+private val SfProFamily = FontFamily.Default
 
 private val AppShapes = Shapes(
     extraSmall = ContinuousRoundedRectangle(2.dp),

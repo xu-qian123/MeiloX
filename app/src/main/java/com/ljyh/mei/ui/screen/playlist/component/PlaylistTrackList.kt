@@ -42,6 +42,7 @@ import com.ljyh.mei.constants.PlaylistTrackTableHeaderKey
 import com.ljyh.mei.data.model.MediaMetadata
 import com.ljyh.mei.ui.glass.LocalGlassColors
 import com.ljyh.mei.ui.component.item.Track
+import com.ljyh.mei.ui.local.rememberCurrentSongId
 import com.ljyh.mei.utils.rememberPreference
 
 @Composable
@@ -87,10 +88,12 @@ fun PlaylistTrackList(
                 ) { index ->
                     val track = pagingItems[index]
                     if (track != null) {
+                        val currentSongId = rememberCurrentSongId()
                         Track(
                             track = track,
                             index = index,
                             isTablet = isTablet,
+                            isPlaying = track.id == currentSongId,
                             onClick = { onTrackClick(track, index) },
                             onMoreClick = { onMoreClick(track, it) }
                         )
@@ -151,10 +154,12 @@ fun PlaylistTrackList(
                     }
                 }
                 itemsIndexed(staticTracks, key = { _, item -> item.id }) { index, track ->
+                    val currentSongId = rememberCurrentSongId()
                     Track(
                         track = track,
                         index = index,
                         isTablet = isTablet,
+                        isPlaying = track.id == currentSongId,
                         onClick = { onTrackClick(track, index) },
                         onMoreClick = { onMoreClick(track, it) }
                     )
@@ -202,6 +207,7 @@ fun LazyListScope.playlistTrackItems(
         ) { index ->
             val track = pagingItems[index]
             if (track != null) {
+                val currentSongId = rememberCurrentSongId()
                 PlaylistSurface(
                     isFirst = index == 0 && !(isTablet && showTableHeader),
                     isLast = index == itemCount - 1 && !hasAppendFooter,
@@ -210,6 +216,7 @@ fun LazyListScope.playlistTrackItems(
                         track = track,
                         index = index,
                         isTablet = isTablet,
+                        isPlaying = track.id == currentSongId,
                         onClick = { onTrackClick(track, index) },
                         onMoreClick = if (selectionMode) null else { { onMoreClick(track, it) } },
                         selected = if (selectionMode) track.id.toString() in selectedTrackIds else null,
@@ -251,6 +258,7 @@ fun LazyListScope.playlistTrackItems(
         }
     } else {
         itemsIndexed(staticTracks, key = { _, item -> item.id }) { index, track ->
+            val currentSongId = rememberCurrentSongId()
             PlaylistSurface(
                 isFirst = index == 0,
                 isLast = index == staticTracks.lastIndex,
@@ -259,6 +267,7 @@ fun LazyListScope.playlistTrackItems(
                     track = track,
                     index = index,
                     isTablet = isTablet,
+                    isPlaying = track.id == currentSongId,
                     onClick = { onTrackClick(track, index) },
                     onMoreClick = if (selectionMode) null else { { onMoreClick(track, it) } },
                         selected = if (selectionMode) track.id.toString() in selectedTrackIds else null,

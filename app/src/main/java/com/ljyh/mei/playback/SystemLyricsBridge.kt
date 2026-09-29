@@ -76,6 +76,13 @@ internal class SystemLyricsBridge(
                 if (enabled) publishLyrics()
             }
         }
+        scope.launch {
+            // Offset-only changes keep the same LyricData instance; force a republish
+            // so system lyrics follow the per-song offset.
+            lyricManager.lyricOffsetMs.collect {
+                if (enabled) publishLyrics(force = true)
+            }
+        }
     }
 
     override fun onEvents(player: Player, events: Player.Events) {
@@ -124,7 +131,7 @@ internal class SystemLyricsBridge(
         colorOsPublisher.setLyrics(null, null)
         // Clear the old timeline before any asynchronous lyric request can finish.
         superLyricPublisher.setSong(null, null, displayTranslation, displayRoma)
-        withProvider { provider?.player?.setSong(current?.toSystemLyricSong(null)) }
+        withProvider { provider?.player?.setSong(current?.toSystemLyricSong(null, lyricManager.lyricOffsetMs.value)) }
         if (current != null) lyricManager.loadLyrics(current)
         publishLyrics(force = true)
     }
@@ -141,7 +148,7 @@ internal class SystemLyricsBridge(
         val data = lyricManager.lyricData.value
         if (!force && publishedLyrics === data) return
         publishedLyrics = data
-        val song = current.toSystemLyricSong(data)
+        val song = current.toSystemLyricSong(data, lyricManager.lyricOffsetMs.value)
         superLyricPublisher.setSong(song, current.album.title, displayTranslation, displayRoma)
         colorOsPublisher.setLyrics(
             current.id.toString(),

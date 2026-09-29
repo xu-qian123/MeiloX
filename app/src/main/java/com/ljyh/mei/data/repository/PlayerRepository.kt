@@ -2,6 +2,7 @@ package com.ljyh.mei.data.repository
 
 import com.ljyh.mei.data.model.Lyric
 import com.ljyh.mei.data.model.Tracks
+import com.ljyh.mei.data.model.AmllLyricSearchResult
 import com.ljyh.mei.data.model.api.GetIntelligence
 import com.ljyh.mei.data.model.api.GetLyric
 import com.ljyh.mei.data.model.api.GetLyricV1
@@ -22,9 +23,13 @@ import android.util.Base64
 import com.ljyh.mei.data.model.api.CheckSongLike
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okio.IOException
+import org.json.JSONArray
+import org.json.JSONObject
 import timber.log.Timber
 import java.util.concurrent.TimeUnit
 
@@ -172,6 +177,84 @@ class PlayerRepository(
                 result
             } catch (e: IOException) {
                 Resource.Error("网络异常，请检查你的网络连接")
+            }
+        }
+    }
+
+    /**
+     * 关键词搜索 AMLL TTML DB（多源匹配用）。
+     */
+    suspend fun searchAMLLLyrics(query: String): List<AmllLyricSearchResult> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val body = JSONObject()
+                    .put("query", query)
+                    .put("type", "title")
+                    .toString()
+                    .toRequestBody("application/json; charset=utf-8".toMediaType())
+                val request = Request.Builder()
+                    .url("https://amlldb.bikonoo.com/api/search-lyrics")
+                    .post(body)
+                    .build()
+                amllClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@withContext emptyList()
+                    parseAmllSearchResults(response.body?.string().orEmpty())
+                }
+            } catch (e: Exception) {
+                Timber.tag("PlayerRepository").w(e, "AMLL search failed")
+                emptyList()
+            }
+        }
+    }
+
+    /**
+     * 按文件名取 AMLL TTML 内容（多源匹配用）。
+     */
+    suspend fun getAMLLLyricRaw(file: String): String? {
+        return withContext(Dispatchers.IO) {
+            try {
+                val safeFile = file.trim()
+                    .takeIf { it.endsWith(".ttml") && '/' !in it }
+                    ?: return@withContext null
+                val request = Request.Builder()
+                    .url("https://amlldb.bikonoo.com/raw-lyrics/$safeFile")
+                    .build()
+                amllClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@withContext null
+                    response.body?.string()?.takeIf { it.isNotBlank() }
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    private fun parseAmllSearchResults(body: String): List<AmllLyricSearchResult> {
+        val array = JSONArray(body)
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val file = item.optString("file").takeIf { it.endsWith(".ttml") } ?: continue
+                add(
+                    AmllLyricSearchResult(
+                        file = file,
+                        title = item.optString("title"),
+                        titles = item.optStringArray("titles"),
+                        artist = item.optString("artist"),
+                        artists = item.optStringArray("artists"),
+                        albums = item.optStringArray("albums"),
+                    )
+                )
+            }
+        }
+    }
+
+    private fun JSONObject.optStringArray(name: String): List<String> {
+        val array = optJSONArray(name) ?: return emptyList()
+        return buildList {
+            for (index in 0 until array.length()) {
+                val value = array.optString(index).trim()
+                if (value.isNotBlank()) add(value)
             }
         }
     }

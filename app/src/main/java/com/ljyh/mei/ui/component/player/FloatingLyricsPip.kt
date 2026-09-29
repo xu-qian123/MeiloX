@@ -114,7 +114,7 @@ fun FloatingLyricsPipScreen(
             floatingLyricsPipParams(context, isPlaying),
         )
         while (isActive) {
-            position = playerConnection.player.currentPosition
+            position = playerConnection.player.currentPosition + viewModel.lyricOffset.value
             delay(if (isPlaying) 120L else 500L)
         }
     }

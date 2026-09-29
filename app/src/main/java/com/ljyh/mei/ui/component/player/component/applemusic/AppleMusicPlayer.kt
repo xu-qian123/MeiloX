@@ -285,6 +285,7 @@ fun AppleMusicPlayer(
                         LyricScreen(
                             lyricData = lyricLine,
                             playerConnection = stateContainer.playerConnection,
+                            lyricOffsetMs = stateContainer.lyricOffsetMs.value,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
@@ -292,17 +293,8 @@ fun AppleMusicPlayer(
                             onClick = {
                                 mediaMetadata?.let {
                                     if (overlayHandler.currentOverlayValue is OverlayState.None) {
-                                        stateContainer.playerViewModel.searchQQSong(it.title)
-                                        overlayHandler.showQQMusicSelection(
-                                            mediaMetadata = it
-                                        )
+                                        overlayHandler.showLyricMatch(it)
                                     }
-                                }
-                            },
-                            onLongClick = { source ->
-                                if (source == LyricSource.QQMusic && mediaMetadata != null) {
-                                    stateContainer.playerViewModel.deleteSongById(id = mediaMetadata!!.id.toString())
-                                    android.widget.Toast.makeText(context, "已删除QQ音乐歌词", android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             },
                             controlsVisible = stateContainer.controlsVisible,

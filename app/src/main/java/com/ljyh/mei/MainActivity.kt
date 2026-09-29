@@ -482,23 +482,6 @@ class MainActivity : ComponentActivity() {
                     val density = LocalDensity.current
                     val windowsInsets = WindowInsets.systemBars
                     val currentRoute = navController.currentRoute
-                    val handlesKeyboardInsets = active || currentRoute == Screen.Search.route ||
-                        currentRoute?.startsWith("${Screen.PrivateConversation.route}/") == true
-                    DisposableEffect(handlesKeyboardInsets) {
-                        val previousMode = window.attributes.softInputMode
-                        if (handlesKeyboardInsets) {
-                            window.setSoftInputMode(
-                                (previousMode and android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()) or
-                                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING,
-                            )
-                        }
-                        onDispose {
-                            if (handlesKeyboardInsets) window.setSoftInputMode(previousMode)
-                        }
-                    }
-                    val imeInsets = WindowInsets.ime
-                    val searchBottomInset = maxOf(with(density) { imeInsets.getBottom(this).toDp() },
-                        WindowInsets.systemBars.asPaddingValues().calculateBottomPadding())
 
                     val bottomInset by remember {
                         derivedStateOf {
@@ -612,6 +595,25 @@ class MainActivity : ComponentActivity() {
                     }.value
                     val playerDismissed by remember(playerBottomSheetState) {
                         derivedStateOf { playerBottomSheetState.isDismissed }
+                    }
+
+                    // Player overlays (lyrics editor / lyric search) host the keyboard in their
+                    // own dialog windows; keep the main window static so the player page, its GL
+                    // background and the recorded backdrops are not re-laid out on every IME frame.
+                    val handlesKeyboardInsets = active || currentRoute == Screen.Search.route ||
+                        currentRoute?.startsWith("${Screen.PrivateConversation.route}/") == true ||
+                        isPlayerPage
+                    DisposableEffect(handlesKeyboardInsets) {
+                        val previousMode = window.attributes.softInputMode
+                        if (handlesKeyboardInsets) {
+                            window.setSoftInputMode(
+                                (previousMode and android.view.WindowManager.LayoutParams.SOFT_INPUT_MASK_ADJUST.inv()) or
+                                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING,
+                            )
+                        }
+                        onDispose {
+                            if (handlesKeyboardInsets) window.setSoftInputMode(previousMode)
+                        }
                     }
                     SideEffect {
                         val transparent = android.graphics.Color.TRANSPARENT
@@ -884,7 +886,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                                                 CompositionLocalProvider(
                                                     LocalPlayerAwareWindowInsets provides
-                                                        if (meiRoute.route == Screen.Search.route) entryPlayerAwareWindowInsets.union(imeInsets)
+                                                        if (meiRoute.route == Screen.Search.route) entryPlayerAwareWindowInsets.union(WindowInsets.ime)
                                                         else entryPlayerAwareWindowInsets,
                                                 ) {
                                                     navigationEntry(
@@ -903,6 +905,14 @@ class MainActivity : ComponentActivity() {
                                         enter = fadeIn(),
                                         exit = fadeOut(),
                                     ) {
+                                        // Read the IME inset only while the search overlay is composed.
+                                        // Keeping this out of the root scope stops the player page (and the
+                                        // recorded backdrops the player sheet samples) from being redrawn on
+                                        // every keyboard animation frame.
+                                        val searchBottomInset = maxOf(
+                                            WindowInsets.ime.asPaddingValues().calculateBottomPadding(),
+                                            WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+                                        )
                                         Box(
                                             Modifier
                                                 .fillMaxSize()
@@ -948,6 +958,12 @@ class MainActivity : ComponentActivity() {
                             CompositionLocalProvider(
                                 LocalGlassBackdrop provides bottomControlsBackdrop,
                             ) {
+                                // Scoped to the search overlay so the root scope never reads the IME
+                                // inset (which would recompose the player page every keyboard frame).
+                                val searchBarBottomInset = maxOf(
+                                    WindowInsets.ime.asPaddingValues().calculateBottomPadding(),
+                                    WindowInsets.systemBars.asPaddingValues().calculateBottomPadding(),
+                                )
                                 IosBottomSearchToolbar(
                                     query = query,
                                     onQueryChange = onQueryChange,
@@ -959,7 +975,7 @@ class MainActivity : ComponentActivity() {
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 12.dp)
-                                        .padding(bottom = searchBottomInset + NavigationBarBottomMargin),
+                                        .padding(bottom = searchBarBottomInset + NavigationBarBottomMargin),
                                 )
                             }
                         }

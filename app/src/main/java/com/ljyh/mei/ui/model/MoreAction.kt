@@ -25,6 +25,7 @@ enum class MoreAction(
     // --- 高级功能 ---
     SLEEP_TIMER("sleep", R.string.more_action_sleep_timer, "moon", 3, 2),
     PICTURE_IN_PICTURE("pip", R.string.more_action_floating_lyrics, "pip", 4, 1),
+    EDIT_LYRICS("edit_lyrics", R.string.more_action_edit_lyrics, "square.and.pencil", 4, 2),
     // 播放界面底部功能
     BOTTOM_ACTION("bottom_action", R.string.more_action_bottom_actions, "switch.2", 4, 4),
 

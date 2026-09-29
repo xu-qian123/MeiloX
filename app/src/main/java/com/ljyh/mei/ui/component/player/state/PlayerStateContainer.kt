@@ -63,6 +63,9 @@ class PlayerStateContainer(
     lateinit var lyricResult: State<LyricData>
         internal set
 
+    lateinit var lyricOffsetMs: State<Long>
+        internal set
+
     lateinit var qqLyricSearch: State<Resource<SearchResult>>
         internal set
 
@@ -120,6 +123,7 @@ fun rememberPlayerStateContainer(
     container.isFMMode = playerConnection.isFMMode.collectAsState()
 
     container.lyricResult = playerViewModel.lyric.collectAsState()
+    container.lyricOffsetMs = playerViewModel.lyricOffset.collectAsState()
     container.qqLyricSearch = playerViewModel.searchResult.collectAsState()
     container.checkSongLike = playerViewModel.like.collectAsState()
     container.allPlaylist = playerViewModel.localPlaylists.collectAsState()

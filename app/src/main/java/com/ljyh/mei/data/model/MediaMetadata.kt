@@ -26,6 +26,11 @@ data class MediaMetadata(
     val tns:String?=null,
     val isPodcast: Boolean = false,
     val isLocal: Boolean = false,
+    /**
+     * Stable identity of the original source (e.g. the Room `Song.id` for local
+     * tracks or the podcast program id). Falls back to [id] when absent.
+     */
+    val originId: String? = null,
 ) {
     data class Artist(
         val id: Long,
@@ -52,6 +57,17 @@ data class MediaMetadata(
 }
 
 const val PLACEHOLDER_URI = "https://placeholder.media"
+
+/**
+ * Identity used by custom lyrics and per-song lyric preferences.
+ * Mirrors NeriPlayer's `stableKey` (`id|album|mediaUri`) with the fields
+ * MeiloX carries; [MediaMetadata.originId] keeps local tracks stable.
+ */
+fun MediaMetadata.stableKey(): String = buildString {
+    append(originId?.takeIf { it.isNotBlank() } ?: id.toString())
+    append('|')
+    append(album.id)
+}
 
 fun PlaylistDetail.Playlist.Track.toMediaMetadata() = MediaMetadata(
     id = id,
@@ -239,6 +255,7 @@ fun com.ljyh.mei.data.model.room.Song.toMediaMetadata(): MediaMetadata {
         duration = duration * 1000,
         album = MediaMetadata.Album(id = album.hashCode().toLong().let { if (it < 0) -it else it }, title = album),
         isLocal = sourceType == com.ljyh.mei.data.model.room.SourceType.LOCAL,
+        originId = id,
     )
 }
 

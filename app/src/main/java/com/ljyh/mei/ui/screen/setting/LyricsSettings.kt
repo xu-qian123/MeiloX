@@ -18,6 +18,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.ljyh.mei.R
 import com.ljyh.mei.constants.LyricAutoFollowEnabledKey
+import com.ljyh.mei.constants.LyricSourcePreferenceKey
+import com.ljyh.mei.constants.PreferWordTimedLyricsKey
 import com.ljyh.mei.constants.SystemLyricsEnabledKey
 import com.ljyh.mei.constants.LyricGlowEnabledKey
 import com.ljyh.mei.constants.LyricLiftEnabledKey
@@ -41,6 +43,7 @@ import com.ljyh.mei.ui.local.LocalNavController
 import com.ljyh.mei.ui.local.LocalPlayerAwareWindowInsets
 import com.ljyh.mei.utils.rememberEnumPreference
 import com.ljyh.mei.utils.rememberPreference
+import com.ljyh.mei.utils.lyric.match.LyricSourcePreference
 
 @Composable
 fun LyricsSettings() {
@@ -57,6 +60,11 @@ fun LyricsSettings() {
     val (floatingTranslation, onFloatingTranslation) = rememberPreference(FloatingLyricsTranslationKey, true)
     val (floatingNext, onFloatingNext) = rememberPreference(FloatingLyricsNextLineKey, true)
     val (floatingScale, onFloatingScale) = rememberPreference(FloatingLyricsFontScaleKey, 1f)
+    val (preferWordTimed, onPreferWordTimed) = rememberPreference(PreferWordTimedLyricsKey, true)
+    val (sourcePreference, onSourcePreference) = rememberEnumPreference(
+        LyricSourcePreferenceKey,
+        LyricSourcePreference.Automatic,
+    )
 
     IosPinnedListPage(
         title = stringResource(R.string.lyrics_settings),
@@ -79,6 +87,28 @@ fun LyricsSettings() {
                             items = LyricVisualStyle.entries,
                             onSelected = onStyle,
                             label = { lyricStyleLabel(it) },
+                        )
+                    }
+                }
+            }
+        }
+        item {
+            SettingsGroup(stringResource(R.string.lyrics_source_settings)) {
+                LyricsToggleRow(stringResource(R.string.lyrics_prefer_word_timed), preferWordTimed, onPreferWordTimed)
+                GlassCard(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(R.string.lyrics_source_preference),
+                            modifier = Modifier.weight(1f),
+                        )
+                        IosPopupButton(
+                            selected = sourcePreference,
+                            items = LyricSourcePreference.entries,
+                            onSelected = onSourcePreference,
+                            label = { lyricSourcePreferenceLabel(it) },
                         )
                     }
                 }
@@ -140,6 +170,17 @@ private fun lyricStyleLabel(style: LyricVisualStyle): String = stringResource(
         LyricVisualStyle.EVA -> R.string.lyrics_style_eva
         LyricVisualStyle.TextPV -> R.string.lyrics_style_textpv
         LyricVisualStyle.Skyline -> R.string.lyrics_style_skyline
+    },
+)
+
+@Composable
+private fun lyricSourcePreferenceLabel(preference: LyricSourcePreference): String = stringResource(
+    when (preference) {
+        LyricSourcePreference.Automatic -> R.string.lyrics_source_automatic
+        LyricSourcePreference.AMLL_TTML -> R.string.lyrics_match_source_amll
+        LyricSourcePreference.KUGOU -> R.string.lyrics_match_source_kugou
+        LyricSourcePreference.CLOUD_MUSIC -> R.string.lyrics_match_source_netease
+        LyricSourcePreference.QQ_MUSIC -> R.string.lyrics_match_source_qq
     },
 )
 

@@ -57,6 +57,7 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.emptyBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
@@ -401,16 +402,23 @@ fun <T> GlassSegmentedControl(
     onSelected: (T) -> Unit,
     modifier: Modifier = Modifier,
     backdrop: Backdrop = LocalGlassBackdrop.current,
+    /**
+     * Sheet controls render in their own window; sampling the page behind the
+     * sheet would reveal the wrong background through the moving pill. Pass
+     * false to keep the glass effects without sampling any page content.
+     */
+    sampleBackdrop: Boolean = true,
 ) {
     require(items.isNotEmpty())
     val colors = LocalGlassColors.current
+    val resolvedBackdrop = if (sampleBackdrop) backdrop else emptyBackdrop()
     val isLight = !colors.isDark
     val selectedIndex = items.indexOfFirst { it.first == selected }.coerceAtLeast(0)
     val currentItems by rememberUpdatedState(items)
     val currentOnSelected by rememberUpdatedState(onSelected)
     val scope = rememberCoroutineScope()
     val tabsBackdrop = rememberLayerBackdrop()
-    val indicatorBackdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop)
+    val indicatorBackdrop = rememberCombinedBackdrop(resolvedBackdrop, tabsBackdrop)
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val trackColor = colors.segmentedControlBackground
 
@@ -461,9 +469,9 @@ fun <T> GlassSegmentedControl(
                 },
             )
         }
-        val hiddenGlassModifier = remember(backdrop, animation, trackColor) {
+        val hiddenGlassModifier = remember(resolvedBackdrop, animation, trackColor) {
             Modifier.drawBackdrop(
-                backdrop = backdrop,
+                backdrop = resolvedBackdrop,
                 shape = { Capsule() },
                 effects = {
                     val press = animation.pressProgress

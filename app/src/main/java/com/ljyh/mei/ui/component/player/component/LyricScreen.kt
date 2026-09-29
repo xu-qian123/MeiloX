@@ -8,7 +8,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -29,6 +28,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -88,8 +88,8 @@ fun LyricScreen(
     lyricData: LyricData,
     modifier: Modifier = Modifier,
     playerConnection: PlayerConnection,
+    lyricOffsetMs: Long = 0L,
     onClick: (LyricSource) -> Unit,
-    onLongClick: (LyricSource) -> Unit,
     controlsVisible: Boolean,
     onToggleControls: (Boolean) -> Unit
 ) {
@@ -104,6 +104,10 @@ fun LyricScreen(
         LyricTextSize.Size18
     )
     val (accompanimentLyricTextBold, _) = rememberPreference(AccompanimentLyricTextBoldKey, true)
+
+    // Read through a state holder so offset slider changes do not restart the
+    // position loop (which would replay the fade-in animation).
+    val currentLyricOffset by rememberUpdatedState(lyricOffsetMs)
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
@@ -224,7 +228,7 @@ fun LyricScreen(
                                             lyricAlpha.animateTo(0f, tween(120))
                                         }
                                         // Seeking may continue while the old lyrics fade out.
-                                        position = player.currentPosition.coerceAtLeast(0L)
+                                        position = (player.currentPosition + currentLyricOffset).coerceAtLeast(0L)
                                         focusIndex = lyricFocusLineIndex(lines, position.toInt())
                                         // A gesture may start during the fade. Leave it in control.
                                         if (!listState.isScrollInProgress) {
@@ -258,7 +262,9 @@ fun LyricScreen(
                             lyrics = lyricData.lyricLine,
                             currentPosition = { animatedPosition.toInt() },
                             onLineClicked = { line ->
-                                playerConnection.player.seekTo(line.start.toLong())
+                                playerConnection.player.seekTo(
+                                    (line.start.toLong() - currentLyricOffset).coerceAtLeast(0L)
+                                )
                                 onToggleControls(true)
                             },
                             onLinePressed = { line ->
@@ -314,7 +320,6 @@ fun LyricScreen(
                         .padding( bottom = 8.dp)
                         .onGloballyPositioned { badgeBounds = it.boundsInParent() },
                     onClick = onClick,
-                    onLongClick = onLongClick
                 )
             }
         }
@@ -373,7 +378,6 @@ private fun LyricSourceBadge(
     source: LyricSource,
     modifier: Modifier = Modifier,
     onClick: (LyricSource) -> Unit,
-    onLongClick: (LyricSource) -> Unit
 ) {
     Box(
         modifier = modifier
@@ -381,10 +385,7 @@ private fun LyricSourceBadge(
             .background(Color.White.copy(alpha = 0.2f))
             .border(0.5.dp, Color.White.copy(alpha = 0.1f), ContinuousRoundedRectangle(4.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp)
-            .combinedClickable(
-                onClick = { onClick(source) },
-                onLongClick = { onLongClick(source) }
-            )
+            .clickable { onClick(source) }
     ) {
 
         Icon(
@@ -394,6 +395,9 @@ private fun LyricSourceBadge(
                     LyricSource.NetEaseCloudMusic -> R.drawable.netease
                     LyricSource.QQMusic -> R.drawable.qq
                     LyricSource.AM -> R.drawable.am
+                    // TODO(M4): dedicated custom / kugou badges.
+                    LyricSource.Custom -> R.drawable.empty
+                    LyricSource.Kugou -> R.drawable.empty
                 }
             ),
             modifier = Modifier.size(16.dp),

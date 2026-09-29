@@ -12,24 +12,29 @@ import io.github.proify.lyricon.lyric.model.Song
 import org.json.JSONObject
 import java.util.Locale
 
-internal fun MediaMetadata.toSystemLyricSong(data: LyricData?): Song {
+internal fun MediaMetadata.toSystemLyricSong(data: LyricData?, offsetMs: Long = 0L): Song {
     val lines = data?.takeUnless {
         it.isPureMusic || it.source == LyricSource.Empty || it.source == LyricSource.Loading
     }?.lyricLine?.lines.orEmpty().sortedBy { it.start }
+    // Published line timestamps are shifted by the inverse of the display offset,
+    // so consumers highlighting at the real playback position match the UI.
+    val shift = -offsetMs
     val richLines = lines.mapIndexedNotNull { index, line ->
         val karaoke = line as? KaraokeLine
         val plain = line as? SyncedLine
         val text = karaoke?.syllables?.joinToString("") { it.content } ?: plain?.content
         if (text.isNullOrBlank()) return@mapIndexedNotNull null
-        val begin = line.start.toLong().coerceAtLeast(0L)
-        val end = line.end.toLong().takeIf { it > begin }
-            ?: lines.getOrNull(index + 1)?.start?.toLong()?.takeIf { it > begin }
-            ?: duration.takeIf { it > begin }
-            ?: (begin + 3_000L)
+        val rawBegin = line.start.toLong() + shift
+        val begin = rawBegin.coerceAtLeast(0L)
+        val rawEnd = line.end.toLong().takeIf { it > rawBegin }
+            ?: lines.getOrNull(index + 1)?.start?.toLong()?.takeIf { it > rawBegin }
+            ?: duration.takeIf { it > rawBegin }
+            ?: (rawBegin + 3_000L)
+        val end = if (rawEnd > begin) rawEnd else begin + 1L
         val words = karaoke?.syllables?.mapNotNull { syllable ->
             if (syllable.content.isEmpty()) return@mapNotNull null
-            val wordBegin = syllable.start.toLong().coerceIn(begin, end - 1L)
-            val wordEnd = syllable.end.toLong().coerceIn(wordBegin + 1L, end)
+            val wordBegin = (syllable.start.toLong() + shift).coerceIn(begin, end - 1L)
+            val wordEnd = (syllable.end.toLong() + shift).coerceIn(wordBegin + 1L, end)
             LyricWord(
                 begin = wordBegin,
                 end = wordEnd,

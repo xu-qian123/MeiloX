@@ -89,6 +89,7 @@ data class PlaybackItemSnapshot(
     val isPodcast: Boolean = false,
     val isLocal: Boolean = false,
     val isPlaceholder: Boolean = false,
+    val originId: String? = null,
 )
 
 data class PlaybackArtistSnapshot(
@@ -231,6 +232,7 @@ class PlaybackPersistence(
             isPodcast = domainMetadata?.isPodcast ?: false,
             isLocal = domainMetadata?.isLocal ?: false,
             isPlaceholder = placeholder,
+            originId = domainMetadata?.originId,
         )
     }
 
@@ -259,6 +261,7 @@ class PlaybackPersistence(
             tns = translatedName,
             isPodcast = isPodcast,
             isLocal = isLocal,
+            originId = originId,
         )
         val displayMetadata = androidx.media3.common.MediaMetadata.Builder()
             .setTitle(domainMetadata.title)

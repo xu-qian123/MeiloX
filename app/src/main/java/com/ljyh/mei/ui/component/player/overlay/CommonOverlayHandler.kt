@@ -14,6 +14,8 @@ import androidx.media3.common.util.UnstableApi
 import com.ljyh.mei.ui.component.player.OverlayState
 import com.ljyh.mei.ui.component.player.PlayerViewModel
 import com.ljyh.mei.ui.component.player.component.sheet.AlbumArtistBottomSheet
+import com.ljyh.mei.ui.component.player.component.sheet.LyricsEditorSheet
+import com.ljyh.mei.ui.component.player.component.sheet.LyricMatchSheet
 import com.ljyh.mei.ui.component.player.component.sheet.MoreActionsSheet
 import com.ljyh.mei.ui.component.player.component.sheet.PlayerActionSettingsSheet
 import com.ljyh.mei.ui.component.player.component.sheet.PlaylistBottomSheet
@@ -102,6 +104,22 @@ fun CommonOverlayHandler(
                 viewmodel = playerViewModel,
                 mediaMetadata = overlay.mediaMetadata,
                 onDismiss = { overlayHandler.dismiss() }
+            )
+        }
+
+        is OverlayState.LyricsEditor -> {
+            LyricsEditorSheet(
+                viewModel = playerViewModel,
+                metadata = overlay.mediaMetadata,
+                onDismiss = { overlayHandler.dismiss() },
+            )
+        }
+
+        is OverlayState.LyricMatch -> {
+            LyricMatchSheet(
+                viewModel = playerViewModel,
+                metadata = overlay.mediaMetadata,
+                onDismiss = { overlayHandler.dismiss() },
             )
         }
 

@@ -15,6 +15,14 @@ sealed interface OverlayState {
         val mediaMetadata: MediaMetadata
     ): OverlayState
 
+    data class LyricsEditor(
+        val mediaMetadata: MediaMetadata
+    ): OverlayState
+
+    data class LyricMatch(
+        val mediaMetadata: MediaMetadata
+    ): OverlayState
+
     data class AlbumArtist(val album: MediaMetadata.Album, val artists: List<MediaMetadata.Artist>,val cover:String): OverlayState
     data class SongInfo(val metadata: MediaMetadata): OverlayState
     data object MoreAction: OverlayState

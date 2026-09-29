@@ -98,6 +98,7 @@ fun IosColorPicker(
                     selected = mode,
                     onSelected = { mode = it },
                     modifier = Modifier.fillMaxWidth(),
+                    sampleBackdrop = false,
                 )
                 Spacer(Modifier.height(12.dp))
                 when (mode) {

@@ -89,6 +89,7 @@ import com.ljyh.mei.ui.glass.SfSymbol
 import com.ljyh.mei.ui.local.LocalNavController
 import com.ljyh.mei.ui.local.LocalPlayerAwareWindowInsets
 import com.ljyh.mei.ui.local.LocalPlayerConnection
+import com.ljyh.mei.ui.local.rememberCurrentSongId
 import com.ljyh.mei.ui.model.Album
 import com.ljyh.mei.ui.navigation.LibraryPage
 import com.ljyh.mei.ui.screen.Screen
@@ -380,8 +381,10 @@ fun LibraryMobileLayout(
                             key = { "liked-${it.id}" },
                             contentType = { "liked-song" },
                         ) { song ->
+                            val currentSongId = rememberCurrentSongId()
                             LibrarySongRow(
                                 song = song,
+                                isPlaying = song.id == currentSongId,
                                 onClick = {
                                     val index = visibleLikedSongs.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
                                     playerConnection?.playQueue(
@@ -570,6 +573,7 @@ fun LibraryMobileLayout(
 @Composable
 private fun LibrarySongRow(
     song: MediaMetadata,
+    isPlaying: Boolean = false,
     onClick: () -> Unit,
     onMoreClick: (Rect) -> Unit,
 ) {
@@ -578,6 +582,7 @@ private fun LibrarySongRow(
         image = song.coverUrl,
         title = song.title,
         subtitle = song.artists.joinToString(" / ") { it.name },
+        isPlaying = isPlaying,
         onClick = onClick,
         trailing = {
             Box(
@@ -615,6 +620,7 @@ private fun LibraryMediaRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
+    isPlaying: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     val colors = LocalGlassColors.current
@@ -633,7 +639,7 @@ private fun LibraryMediaRow(
             Text(
                 title,
                 style = IosTypography.body,
-                color = colors.content,
+                color = if (isPlaying) colors.accent else colors.content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -644,6 +650,10 @@ private fun LibraryMediaRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+        if (isPlaying) {
+            SfIcon("speaker.wave.2.fill", null, size = 17.dp, tint = colors.accent)
+            Spacer(Modifier.width(8.dp))
         }
         trailing?.let { trailingContent ->
             CompositionLocalProvider(LocalGroupedListIconColor provides colors.content) {

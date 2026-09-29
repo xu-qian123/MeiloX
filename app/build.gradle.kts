@@ -104,6 +104,7 @@ dependencies {
     implementation(libs.androidx.compose.material3.window.size.class1)
     implementation("com.github.luben:zstd-jni:1.5.7-20@aar")
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
     testRuntimeOnly("com.github.luben:zstd-jni:1.5.7-20")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:${libs.versions.kotlinxCoroutinesGuava.get()}")
     androidTestImplementation(libs.androidx.junit)
@@ -167,6 +168,7 @@ dependencies {
     // 歌词组件
     implementation(libs.lyrics.core)
     implementation(libs.lyrics.ui)
+    implementation(libs.tiny.pinyin)
     implementation("io.github.proify.lyricon:provider:0.1.70")
     implementation("com.github.HChenX:SuperLyricApi:3.4")
     implementation(libs.zoomable)

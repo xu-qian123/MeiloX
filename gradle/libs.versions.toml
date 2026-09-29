@@ -24,6 +24,7 @@ composeBom = "2026.06.00"
 loggingInterceptor = "5.4.0"
 lyricsCoreVersion = "0.4.5"
 lyricsUiVersion = "1.0.19"
+tinyPinyinVersion = "2.0.3.RELEASE"
 material3Android = "1.4.0"
 activityKtx = "1.13.0"
 materialKolor = "4.1.1"
@@ -94,6 +95,7 @@ ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktorCli
 logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", version.ref = "loggingInterceptor" }
 lyrics-core = { module = "com.mocharealm.accompanist:lyrics-core", version.ref = "lyricsCoreVersion" }
 lyrics-ui = { module = "com.mocharealm.accompanist:lyrics-ui", version.ref = "lyricsUiVersion" }
+tiny-pinyin = { module = "io.github.biezhi:TinyPinyin", version.ref = "tinyPinyinVersion" }
 material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-material3-android = { group = "androidx.compose.material3", name = "material3-android", version.ref = "material3Android" }
 androidx-activity-ktx = { group = "androidx.activity", name = "activity-ktx", version.ref = "activityKtx" }

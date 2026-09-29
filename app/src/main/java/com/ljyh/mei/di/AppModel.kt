@@ -2,6 +2,7 @@ package com.ljyh.mei.di
 
 import android.content.Context
 import com.google.gson.Gson
+import com.ljyh.mei.data.repository.CustomLyricRepository
 import com.ljyh.mei.di.repository.AlbumsRepository
 import com.ljyh.mei.di.repository.CachedLyricRepository
 import com.ljyh.mei.di.repository.ColorRepository
@@ -66,6 +67,10 @@ object AppModule {
     @Provides
     fun provideCachedLyricDao(db: AppDatabase): CachedLyricRepository =
         CachedLyricRepository(db.cachedLyricDao())
+
+    @Provides @Singleton
+    fun provideCustomLyricDao(db: AppDatabase): CustomLyricRepository =
+        CustomLyricRepository(db.customLyricDao())
 
     @Provides @Singleton
     fun provideGson(): Gson = Gson()

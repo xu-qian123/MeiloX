@@ -29,11 +29,15 @@ import com.ljyh.mei.di.repository.ColorRepository
 import com.ljyh.mei.di.repository.LikeRepository
 import com.ljyh.mei.di.repository.QQSongRepository
 import com.ljyh.mei.ui.model.LyricData
+import com.ljyh.mei.ui.model.LyricMatchUiState
 import com.ljyh.mei.ui.model.MoreAction
 import com.ljyh.mei.ui.model.SortOrder
 import com.ljyh.mei.utils.dataStore
 import com.ljyh.mei.utils.get
 import com.ljyh.mei.utils.lyric.LyricManager
+import com.ljyh.mei.utils.lyric.match.LyricMatchRequest
+import com.ljyh.mei.utils.lyric.match.LyricMatchSource
+import com.ljyh.mei.utils.lyric.match.LyricMatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -61,6 +65,7 @@ class PlayerViewModel @Inject constructor(
     private val playlistRepository: PlaylistRepository,
     private val likeRepository: LikeRepository,
     private val colorRepository: ColorRepository,
+    private val lyricMatcher: LyricMatcher,
     val lyricManager: LyricManager
 ) : ViewModel() {
     val searchResult: StateFlow<Resource<SearchResult>> = lyricManager.qqSearchResult
@@ -152,6 +157,76 @@ class PlayerViewModel @Inject constructor(
             qqSongRepository.deleteSongById(id)
             lyricManager.loadLyrics(mediaMetadata ?: return@launch, forceReload = true)
         }
+    }
+
+    /** Saves user-edited lyrics for [metadata] and refreshes the timeline. */
+    fun saveCustomLyric(
+        metadata: MediaMetadata,
+        lyric: String?,
+        translatedLyric: String?,
+        matchedSource: String? = null,
+        matchedSongId: String? = null,
+    ) {
+        viewModelScope.launch {
+            lyricManager.saveCustomLyric(metadata, lyric, translatedLyric, matchedSource, matchedSongId)
+        }
+    }
+
+    /** Removes the custom lyric so the network lyrics are shown again. */
+    fun clearCustomLyric(metadata: MediaMetadata) {
+        viewModelScope.launch {
+            lyricManager.clearCustomLyric(metadata)
+        }
+    }
+
+    /** 当前歌曲的用户歌词偏移（毫秒） */
+    val lyricOffset: StateFlow<Long> = lyricManager.lyricOffsetMs
+
+    fun setLyricOffset(metadata: MediaMetadata, offsetMs: Long) {
+        lyricManager.setUserOffset(metadata, offsetMs)
+    }
+
+    // ==================== 多源歌词匹配 ====================
+
+    private val _lyricMatchState = MutableStateFlow<LyricMatchUiState>(LyricMatchUiState.Idle)
+    val lyricMatchState: StateFlow<LyricMatchUiState> = _lyricMatchState.asStateFlow()
+
+    private var lyricMatchJob: Job? = null
+
+    fun searchLyricMatches(
+        metadata: MediaMetadata,
+        keyword: String,
+        sources: Set<LyricMatchSource> = LyricMatchSource.entries.toSet(),
+    ) {
+        lyricMatchJob?.cancel()
+        _lyricMatchState.value = LyricMatchUiState.Loading
+        lyricMatchJob = viewModelScope.launch {
+            val request = LyricMatchRequest(
+                keyword = keyword.trim().ifBlank {
+                    "${metadata.title} ${metadata.artists.firstOrNull()?.name.orEmpty()}".trim()
+                },
+                trackName = metadata.title,
+                artistName = metadata.artists.joinToString(" / ") { it.name },
+                albumName = metadata.album.title,
+                durationMs = metadata.duration,
+                preferWordTimed = true,
+                sources = sources,
+            )
+            _lyricMatchState.value = try {
+                LyricMatchUiState.Success(lyricMatcher.matchLyrics(request))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag("PlayerViewModel").w(e, "Lyric match failed")
+                LyricMatchUiState.Error(e.message ?: "搜索失败")
+            }
+        }
+    }
+
+    fun clearLyricMatches() {
+        lyricMatchJob?.cancel()
+        lyricMatchJob = null
+        _lyricMatchState.value = LyricMatchUiState.Idle
     }
 
     suspend fun getQQSongId(metadataId: Long): String? {

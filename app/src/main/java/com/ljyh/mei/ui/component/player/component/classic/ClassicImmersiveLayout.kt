@@ -97,6 +97,7 @@ fun ClassicImmersiveLayout(
         LyricScreen(
             lyricData = lyricLine,
             playerConnection = stateContainer.playerConnection,
+            lyricOffsetMs = stateContainer.lyricOffsetMs.value,
             modifier = Modifier
                 .weight(0.45f)
                 .fillMaxHeight()
@@ -104,18 +105,8 @@ fun ClassicImmersiveLayout(
             onClick = {
                 mediaMetadata?.let {
                     if (overlayHandler.currentOverlayValue is OverlayState.None) {
-                        stateContainer.playerViewModel.searchQQSong(it.title)
-                        overlayHandler.showQQMusicSelection(
-                            mediaMetadata = it
-                        )
+                        overlayHandler.showLyricMatch(it)
                     }
-                }
-            },
-            onLongClick = { source ->
-                if (source == LyricSource.QQMusic && mediaMetadata != null) {
-                    stateContainer.playerViewModel.deleteSongById(id = mediaMetadata!!.id.toString())
-                    Toast.makeText(context, "已删除QQ音乐歌词", Toast.LENGTH_SHORT)
-                        .show()
                 }
             },
             controlsVisible = stateContainer.controlsVisible,
