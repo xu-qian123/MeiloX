@@ -79,8 +79,13 @@ class MediaUriProvider @Inject constructor(
             } catch (e: Exception) {
                 throw IOException("Network error resolving URL for $mediaId", e)
             }
-            if (response.code != 200) {
+            if (!shouldTryLowerPlaybackQuality(response.code)) {
                 throw IOException("Song URL API returned code ${response.code} for $mediaId")
+            }
+            if (response.code != 200) {
+                // Error envelopes may omit data entirely; try a lower level without
+                // interpreting the success payload (Gson can leave it null).
+                continue
             }
             val source = response.data.firstOrNull { it.id.toString() == mediaId }
             val fullSource = response.fullSourceFor(mediaId)
@@ -124,6 +129,10 @@ class MediaUriProvider @Inject constructor(
                     cacheKey = playbackCacheKey,
                 )
             }
+            Timber.tag("MediaUriProvider").d(
+                "No full source at %s (code=%s); trying the next lower quality for %s",
+                attemptedQuality, response.code, mediaId,
+            )
         }
 
         val message = "No playable full source for $mediaId at quality $requestedQuality"

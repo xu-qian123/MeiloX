@@ -13,6 +13,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -53,6 +56,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextMotion
 import androidx.compose.ui.unit.dp
@@ -62,12 +66,20 @@ import com.kyant.capsule.ContinuousRoundedRectangle
 import com.ljyh.mei.R
 import com.ljyh.mei.constants.AccompanimentLyricTextBoldKey
 import com.ljyh.mei.constants.AccompanimentLyricTextSizeKey
+import com.ljyh.mei.constants.LyricRomanizationEnabledKey
 import com.ljyh.mei.constants.LyricTextSize
+import com.ljyh.mei.constants.LyricTranslationEnabledKey
 import com.ljyh.mei.constants.NormalLyricTextBoldKey
 import com.ljyh.mei.constants.NormalLyricTextSizeKey
 import com.ljyh.mei.playback.PlayerConnection
 import com.ljyh.mei.ui.model.LyricData
 import com.ljyh.mei.ui.model.LyricSource
+import com.ljyh.mei.ui.model.LyricsSecondaryLineMode
+import com.ljyh.mei.ui.model.hasDisplayablePhonetic
+import com.ljyh.mei.ui.model.hasDisplayableTranslation
+import com.ljyh.mei.ui.model.nextLyricsSecondaryLineMode
+import com.ljyh.mei.ui.model.resolveLyricsSecondaryLineMode
+import com.ljyh.mei.ui.model.withSecondaryLineMode
 import com.ljyh.mei.utils.rememberEnumPreference
 import com.ljyh.mei.utils.rememberPreference
 import com.ljyh.mei.utils.setClipboard
@@ -89,6 +101,9 @@ fun LyricScreen(
     modifier: Modifier = Modifier,
     playerConnection: PlayerConnection,
     lyricOffsetMs: Long = 0L,
+    previewPositionMs: Long? = null,
+    secondaryLineModeOverride: LyricsSecondaryLineMode? = null,
+    onSecondaryLineModeOverrideChange: (LyricsSecondaryLineMode?) -> Unit = {},
     onClick: (LyricSource) -> Unit,
     controlsVisible: Boolean,
     onToggleControls: (Boolean) -> Unit
@@ -105,9 +120,29 @@ fun LyricScreen(
     )
     val (accompanimentLyricTextBold, _) = rememberPreference(AccompanimentLyricTextBoldKey, true)
 
+    // 副行（翻译 / 音译）三态循环：状态只作用于当前歌曲（换歌由容器重置），
+    // 不再写全局的翻译/音译开关，避免"开了音译导致别的歌翻译消失"。
+    val (translationEnabled) = rememberPreference(LyricTranslationEnabledKey, true)
+    val (romanizationEnabled) = rememberPreference(LyricRomanizationEnabledKey, true)
+    val hasTranslation = remember(lyricData.lyricLine) { lyricData.lyricLine.hasDisplayableTranslation() }
+    val hasPhonetic = remember(lyricData.lyricLine) { lyricData.lyricLine.hasDisplayablePhonetic() }
+    val secondaryLineMode = resolveLyricsSecondaryLineMode(
+        requestedMode = secondaryLineModeOverride,
+        translationEnabled = translationEnabled,
+        romanizationEnabled = romanizationEnabled,
+        hasTranslation = hasTranslation,
+        hasPhonetic = hasPhonetic,
+    )
+    val displayLyricLine = remember(lyricData.lyricLine, secondaryLineMode) {
+        lyricData.lyricLine.withSecondaryLineMode(secondaryLineMode)
+    }
+
     // Read through a state holder so offset slider changes do not restart the
     // position loop (which would replay the fade-in animation).
     val currentLyricOffset by rememberUpdatedState(lyricOffsetMs)
+
+    // 拖动进度条时用预览位置驱动歌词，松手后由外层在进度追上时清空。
+    val currentPreview by rememberUpdatedState(previewPositionMs)
 
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) {
@@ -145,6 +180,8 @@ fun LyricScreen(
         // lower-half tap-to-toggle gesture runs on the Initial pass and consumes taps
         // before children see them, so the badge region must be excluded explicitly.
         var badgeBounds by remember { mutableStateOf<Rect?>(null) }
+        // 副行切换胶囊同样需要排除，否则点击会被下半屏"切换控制栏"手势吃掉。
+        var secondaryPillBounds by remember { mutableStateOf<Rect?>(null) }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -158,6 +195,8 @@ fun LyricScreen(
                         )
                         val lowerHalf = down.position.y >= size.height / 2f
                         val inBadge = badgeBounds?.inflate(badgeSlop)?.contains(down.position) == true
+                        val inSecondaryPill =
+                            secondaryPillBounds?.inflate(badgeSlop)?.contains(down.position) == true
                         var moved = false
                         var released = false
                         var pressed = true
@@ -169,7 +208,7 @@ fun LyricScreen(
                             }
                             if (change.changedToUpIgnoreConsumed()) {
                                 released = true
-                                if (lowerHalf && !moved && !inBadge) {
+                                if (lowerHalf && !moved && !inBadge && !inSecondaryPill) {
                                     change.consume()
                                     onToggleControls(!controlsVisible)
                                 }
@@ -199,7 +238,7 @@ fun LyricScreen(
                         var lastFocusIndex: Int? = null
                         var initialPositionPending = true
                         while (true) {
-                            var position = player.currentPosition.coerceAtLeast(0L)
+                            var position = (currentPreview ?: player.currentPosition).coerceAtLeast(0L)
                             var focusIndex = lyricFocusLineIndex(lines, position.toInt())
                             var jumped = false
                             if (focusIndex != lastFocusIndex) {
@@ -228,7 +267,7 @@ fun LyricScreen(
                                             lyricAlpha.animateTo(0f, tween(120))
                                         }
                                         // Seeking may continue while the old lyrics fade out.
-                                        position = (player.currentPosition + currentLyricOffset).coerceAtLeast(0L)
+                                        position = ((currentPreview ?: player.currentPosition) + currentLyricOffset).coerceAtLeast(0L)
                                         focusIndex = lyricFocusLineIndex(lines, position.toInt())
                                         // A gesture may start during the fade. Leave it in control.
                                         if (!listState.isScrollInProgress) {
@@ -259,7 +298,7 @@ fun LyricScreen(
                     key(placementGeneration, keepAliveZonePx) {
                         KaraokeLyricsView(
                             listState = listState,
-                            lyrics = lyricData.lyricLine,
+                            lyrics = displayLyricLine,
                             currentPosition = { animatedPosition.toInt() },
                             onLineClicked = { line ->
                                 playerConnection.player.seekTo(
@@ -321,7 +360,74 @@ fun LyricScreen(
                         .onGloballyPositioned { badgeBounds = it.boundsInParent() },
                     onClick = onClick,
                 )
+
+                if (hasTranslation || hasPhonetic) {
+                    LyricSecondaryLinePill(
+                        mode = secondaryLineMode,
+                        hasTranslation = hasTranslation,
+                        hasPhonetic = hasPhonetic,
+                        onCycle = {
+                            val next = nextLyricsSecondaryLineMode(
+                                current = secondaryLineMode,
+                                hasTranslation = hasTranslation,
+                                hasPhonetic = hasPhonetic,
+                            )
+                            onSecondaryLineModeOverrideChange(next)
+                        },
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(bottom = 8.dp)
+                            .onGloballyPositioned { secondaryPillBounds = it.boundsInParent() },
+                    )
+                }
             }
+        }
+    }
+}
+
+/** 副行模式胶囊：点击在「翻译 → 音译 → 关闭」之间循环。 */
+@Composable
+private fun LyricSecondaryLinePill(
+    mode: LyricsSecondaryLineMode,
+    hasTranslation: Boolean,
+    hasPhonetic: Boolean,
+    onCycle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = ContinuousRoundedRectangle(4.dp)
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(Color.White.copy(alpha = 0.2f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.1f), shape)
+            .clickable { onCycle() }
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (hasTranslation) {
+            Text(
+                text = stringResource(R.string.lyrics_secondary_translation_short),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (mode == LyricsSecondaryLineMode.TRANSLATION) {
+                    Color.White
+                } else {
+                    Color.White.copy(alpha = 0.45f)
+                },
+            )
+        }
+        if (hasPhonetic) {
+            Text(
+                text = stringResource(R.string.lyrics_secondary_phonetic_short),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (mode == LyricsSecondaryLineMode.PHONETIC) {
+                    Color.White
+                } else {
+                    Color.White.copy(alpha = 0.45f)
+                },
+            )
         }
     }
 }

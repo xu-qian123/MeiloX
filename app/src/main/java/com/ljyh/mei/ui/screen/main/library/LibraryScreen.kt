@@ -64,8 +64,9 @@ fun LibraryScreen(
     val albumList by viewModel.albumList.collectAsState()
     val userSubcount by viewModel.userSubcount.collectAsState()
     val networkPlaylists by viewModel.networkPlaylistsState.collectAsState()
-    val likedSongs by viewModel.likedSongs.collectAsState()
-    val likedSongsLoading by viewModel.likedSongsLoading.collectAsState()
+    val likedSongs by viewModel.favoriteSongs.collectAsState()
+    val likedSongsRefreshing by viewModel.favoriteSongsRefreshing.collectAsState()
+    val playlistsRefreshing by viewModel.playlistsRefreshing.collectAsState()
 
     // Preferences
     val (userId, setUserId) = rememberPreference(UserIdKey, "")
@@ -77,9 +78,15 @@ fun LibraryScreen(
     // State
     var showPhotoPicker by remember { mutableStateOf(false) }
     var selectedPage by rememberSaveable { mutableStateOf(LibraryPage.Songs) }
-    var subPlaylistCount by remember { mutableIntStateOf(0) }
 
-    val likedPlaylistId = (networkPlaylists as? Resource.Success)?.data?.playlist?.firstOrNull()?.id
+    val freshLikedPlaylistId = (networkPlaylists as? Resource.Success)?.data?.playlist?.firstOrNull()?.id
+    // 刷新期间 networkPlaylists 可能短暂非 Success，用上一次非空值兜底，
+    // 防止「我喜欢的音乐」闪现回列表造成排序跳动。
+    var stableLikedPlaylistId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(freshLikedPlaylistId) {
+        if (freshLikedPlaylistId != null) stableLikedPlaylistId = freshLikedPlaylistId
+    }
+    val likedPlaylistId = freshLikedPlaylistId ?: stableLikedPlaylistId
     val visiblePlaylists = remember(localPlaylists, likedPlaylistId) {
         localPlaylists.filterNot { it.id == likedPlaylistId?.toString() }
     }
@@ -87,22 +94,21 @@ fun LibraryScreen(
         if (userId.isEmpty()) Pair(emptyList(), emptyList())
         else {
             val (created, collected) = visiblePlaylists.partition { it.author == userId }
-            fun sorted(playlists: List<com.ljyh.mei.data.model.room.Playlist>): List<com.ljyh.mei.data.model.room.Playlist> {
-                val maxLocalPlayCount = playlists.maxOfOrNull { it.localPlayCount } ?: 1
-                val maxServerPlayCount = playlists.maxOfOrNull { it.playCount } ?: 1L
-                val now = System.currentTimeMillis()
-                return playlists.sortedByDescending {
-                    it.sortScore(maxLocalPlayCount, maxServerPlayCount, now)
-                }
-            }
-            Pair(sorted(created), sorted(collected))
+            // 顺序与网易云 App 一致：按 API 下标（本地歌单为 0，排各组最前）。
+            Pair(
+                created.sortedBy { it.sortOrder },
+                collected.sortedBy { it.sortOrder },
+            )
         }
     }
 
     // --- 数据同步逻辑 ---
+    // 首次进入（每个进程一次）自动同步；之后进入直接用本地缓存，手动下拉刷新即可。
     LaunchedEffect(userId) {
         if (userId.isNotEmpty()) {
-            viewModel.syncUserPlaylists(userId)
+            if (viewModel.consumeAutoSync()) {
+                viewModel.syncUserPlaylists(userId)
+            }
             viewModel.getPhotoAlbum(userId)
             viewModel.getAlbumList()
             viewModel.getUserSubcount()
@@ -135,15 +141,6 @@ fun LibraryScreen(
         }
     }
 
-    LaunchedEffect(likedPlaylistId) {
-        likedPlaylistId?.let(viewModel::getLikedSongs)
-    }
-
-    LaunchedEffect(subPlaylistCount) {
-        if (userId.isNotEmpty() && localPlaylists.size != subPlaylistCount && subPlaylistCount != 0)
-            viewModel.syncUserPlaylists(userId, subPlaylistCount)
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
 
         if (userId.isNotEmpty()) {
@@ -164,10 +161,12 @@ fun LibraryScreen(
                 },
                 userId = userId,
                 likedSongs = likedSongs,
-                // Keep the spinner up until the liked-playlist id is known and the
-                // first detail request finishes; otherwise the empty state flashes.
-                likedSongsLoading = networkPlaylists is Resource.Loading ||
-                    (likedPlaylistId != null && likedSongsLoading),
+                // 只有「正在刷新且本地为空」时才显示加载圈，其余情况直接展示缓存。
+                likedSongsLoading = likedSongsRefreshing && likedSongs.isEmpty(),
+                likedSongsRefreshing = likedSongsRefreshing,
+                playlistsRefreshing = playlistsRefreshing,
+                onRefreshLikedSongs = { if (userId.isNotEmpty()) viewModel.refreshLikedSongs(userId) },
+                onRefreshPlaylists = { if (userId.isNotEmpty()) viewModel.syncUserPlaylists(userId, refreshing = true) },
             )
 
             if (showPhotoPicker) {

@@ -19,9 +19,10 @@ object LRCParser : ILyricsParser {
      *
      * @param mainLrc LRC 格式的主歌词文本。
      * @param translationLrc 可选的、LRC 格式的翻译文本。
+     * @param romanizationLrc 可选的、LRC 格式的音译文本（网易云 romalrc）。
      * @return 包含合并后歌词的 SyncedLyrics 对象。
      */
-    fun parse(mainLrc: String, translationLrc: String?): SyncedLyrics {
+    fun parse(mainLrc: String, translationLrc: String?, romanizationLrc: String? = null): SyncedLyrics {
         val lyricsLines = LrcMetadataHelper.removeAttributes(mainLrc.lines())
 
         var data = lyricsLines
@@ -37,7 +38,7 @@ object LRCParser : ILyricsParser {
             .map { it.toSyncedLine() }
             .filter { it.content.isNotBlank() }
 
-        return SyncedLyrics(lines = finalLines)
+        return SyncedLyrics(lines = finalLines.withRomanization(romanizationLrc))
     }
 
     override fun canParse(content: String): Boolean {

@@ -1,9 +1,7 @@
 package com.ljyh.mei.playback
 
 import android.content.Context
-import android.util.Log
 import androidx.annotation.OptIn
-import androidx.media3.common.C
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.DatabaseProvider
 import androidx.media3.database.StandaloneDatabaseProvider
@@ -24,8 +22,7 @@ import java.io.File
 @UnstableApi
 object CacheManager {
 
-    // 缓存大小常量，设置为 5 GB，这是一个比较合理的值
-    private const val CACHE_SIZE_BYTES = 1024 * 1024 * 1024L * 10 // 5 GB
+    private const val CACHE_SIZE_BYTES = 1024 * 1024 * 1024L * 10 // 10 GiB
 
     // 使用 @Volatile 注解确保多线程环境下的可见性
     @Volatile
@@ -86,7 +83,7 @@ object CacheManager {
         return CacheDataSource.Factory()
             .setCache(simpleCache)
             .setUpstreamDataSourceFactory(defaultDataSourceFactory) // 改为 defaultDataSourceFactory
-            .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
+            .setFlags(CacheDataSource.FLAG_BLOCK_ON_CACHE or FLAG_IGNORE_CACHE_ON_ERROR)
     }
     @OptIn(UnstableApi::class)
     fun isContentFullyCached(cache: Cache, key: String): Boolean {
@@ -95,20 +92,28 @@ object CacheManager {
         // 获取总长度 (Content-Length)
         val contentLength = ContentMetadata.getContentLength(contentMetadata)
 
-        // 如果不知道总长度，说明还没下载完或者没存长度信息，视为未完全缓存
-        if (contentLength == C.LENGTH_UNSET.toLong()) return false
-        // 检查缓存的字节数是否 >= 总长度
-        val cachedBytes = cache.getCachedBytes(key, 0, contentLength)
-        return cachedBytes >= contentLength
+        if (contentLength <= 0L) return false
+        // As in NeriPlayer, validate the span files, not just the cache index.
+        return hasCompletePlaybackSpans(
+            contentLength,
+            cache.getCachedSpans(key).map { span ->
+                PlaybackCacheSpan(
+                    span.position,
+                    span.length,
+                    span.file?.takeIf { span.isCached && it.isFile }?.length(),
+                )
+            },
+        )
     }
 
     @OptIn(UnstableApi::class)
-    fun findFullyCachedPlaybackKey(cache: Cache, mediaId: String, quality: String): String? {
-        val prefix = playbackCacheKeyPrefix(mediaId, quality)
-        return cache.keys
-            .asSequence()
-            .filter { it.startsWith(prefix) }
-            .firstOrNull { isContentFullyCached(cache, it) }
+    fun findFullyCachedPlaybackKey(
+        cache: Cache,
+        mediaId: String,
+        quality: String,
+        allowOtherQualities: Boolean = false,
+    ): String? = selectCachedPlaybackKey(cache.keys, mediaId, quality, allowOtherQualities) {
+        isContentFullyCached(cache, it)
     }
 
     @OptIn(UnstableApi::class)

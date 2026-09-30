@@ -18,6 +18,7 @@ import com.ljyh.mei.data.repository.CustomLyricRepository
 import com.ljyh.mei.data.repository.PlayerRepository
 import com.ljyh.mei.di.repository.CachedLyricRepository
 import com.ljyh.mei.di.repository.QQSongRepository
+import com.ljyh.mei.di.repository.SongRepository
 import com.ljyh.mei.ui.model.LyricData
 import com.ljyh.mei.ui.model.LyricSource
 import com.ljyh.mei.ui.model.LyricSourceData
@@ -64,6 +65,7 @@ class LyricManager @Inject constructor(
     private val qqSongRepository: QQSongRepository,
     private val cachedLyricRepository: CachedLyricRepository,
     private val customLyricRepository: CustomLyricRepository,
+    private val songRepository: SongRepository,
     private val lyricMatcher: LyricMatcher,
     private val duetDetector: DuetDetector,
     private val preloader: LyricPreloader,
@@ -97,6 +99,8 @@ class LyricManager @Inject constructor(
 
     /** 当前歌词拉取协程 Job，切歌时 cancel */
     private var fetchJob: Job? = null
+    private var wordTimedFallbackJob: Job? = null
+    private val loadSession = LyricLoadSession()
 
     /** Current QQ lyric request, including manually selected songs. */
     private var qqFetchJob: Job? = null
@@ -159,11 +163,13 @@ class LyricManager @Inject constructor(
      */
     fun loadLyrics(metadata: MediaMetadata, forceReload: Boolean = false) {
         val songId = metadata.id.toString()
-        if (!forceReload && currentSongId == songId) return
+        if (!forceReload && currentSongId == songId && lastMetadata?.stableKey() == metadata.stableKey()) return
 
+        val loadToken = loadSession.begin()
         currentSongId = songId
         fetchJob?.cancel()
         qqFetchJob?.cancel()
+        wordTimedFallbackJob?.cancel()
         qqFinalized = false
         currentCustomEntry = null
         wordTimedFallbackRequested = false
@@ -182,11 +188,20 @@ class LyricManager @Inject constructor(
         // 网络拉取
         fetchJob = scope.launch {
             // 自定义歌词优先：命中后跳过全部网络拉取（NeriPlayer 行为）
-            val custom = withContext(Dispatchers.IO) {
-                customLyricRepository.get(metadata.stableKey())
+            val custom = try {
+                withContext(Dispatchers.IO) { customLyricRepository.get(metadata.stableKey()) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Timber.e(error, "Could not load saved lyrics")
+                if (loadSession.isCurrent(loadToken)) {
+                    _lyricData.value = createDefaultLyricData("歌词读取失败", source = LyricSource.Empty)
+                }
+                return@launch
             }
-            if (currentSongId != songId) return@launch
+            if (!loadSession.isCurrent(loadToken)) return@launch
             currentCustomEntry = custom
+            loadSession.setCustomLyrics(loadToken, !custom?.lyric.isNullOrBlank())
             _lyricOffsetMs.value = custom?.userLyricOffsetMs ?: 0L
             val customText = custom?.lyric?.takeIf { it.isNotBlank() }
             if (custom != null && customText != null) {
@@ -197,18 +212,33 @@ class LyricManager @Inject constructor(
                         durationMs = metadata.duration,
                     )
                 }
-                if (currentSongId == songId && data != null) {
-                    _lyricData.value = data
-                    lyricCache[songId] = data
+                if (loadSession.isCurrent(loadToken)) {
+                    val displayed = data ?: createDefaultLyricData(
+                        "自定义歌词格式错误，请编辑修正", source = LyricSource.Custom,
+                    ).copy(rawLyrics = customText, rawTranslation = custom.translatedLyric)
+                    _lyricData.value = displayed
+                    lyricCache[songId] = displayed
                     trimCache()
                     return@launch
                 }
             }
 
+            // 本地/已下载歌曲：优先使用音频文件旁的歌词边车（主歌词 / 翻译 / 音译）。
+            // 流媒体曲目没有本地文件路径，这里会快速返回 null。
+            val localData = withContext(Dispatchers.IO) { loadLocalSidecarLyric(metadata) }
+            if (currentSongId != songId) return@launch
+            if (localData != null) {
+                val displayed = applyCustomTranslationOverlay(localData)
+                _lyricData.value = displayed
+                lyricCache[songId] = displayed
+                trimCache()
+                return@launch
+            }
+
             // 缓存查找：内存（同步）
             if (!forceReload) {
                 lyricCache.remove(songId)?.let { cached ->
-                    _lyricData.value = cached
+                    _lyricData.value = applyCustomTranslationOverlay(cached)
                 }
             }
 
@@ -218,7 +248,7 @@ class LyricManager @Inject constructor(
                     cachedLyricRepository.get(songId).firstOrNull()
                 }
                 if (dbCached != null && currentSongId == songId) {
-                    val data = dbCached.toLyricData()
+                    val data = applyCustomTranslationOverlay(dbCached.toLyricData())
                     _lyricData.value = data
                     lyricCache[songId] = data
                 }
@@ -226,8 +256,8 @@ class LyricManager @Inject constructor(
 
             delay(100)
 
-            launch { fetchNetEaseLyric(songId) }
-            launch { fetchAMLLyric(songId) }
+            launch { fetchNetEaseLyric(songId, loadToken) }
+            launch { fetchAMLLyric(songId, loadToken) }
 
             // QQ 音乐拉取（带超时控制）
             val localSong = qqSongRepository.getQQSong(songId).firstOrNull()
@@ -255,6 +285,27 @@ class LyricManager @Inject constructor(
                 launch { searchAndMatchBest(metadata) }
             }
         }
+    }
+
+    /**
+     * 读取本地歌曲的歌词边车（主歌词 + 翻译 + 音译）。
+     * 找不到主歌词边车时返回 null，交给后续的网络歌词流程。
+     */
+    private suspend fun loadLocalSidecarLyric(metadata: MediaMetadata): LyricData? {
+        val songKey = metadata.originId?.takeIf { it.isNotBlank() } ?: metadata.id.toString()
+        val path = songRepository.getSong(songKey).firstOrNull()?.path
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        val sidecars = resolveLocalLyricSidecars(path)
+        val mainLyric = sidecars.lyric?.readSidecarText() ?: return null
+        val data = LyricFormatDetector.parseForDisplay(
+            raw = mainLyric,
+            translatedLyrics = sidecars.translation?.readSidecarText(),
+            durationMs = metadata.duration,
+            romanizationLyrics = sidecars.romanization?.readSidecarText(),
+        ) ?: return null
+        Timber.tag(TAG).d("Local lyric sidecar loaded for $songKey")
+        return data
     }
 
     /**
@@ -365,12 +416,16 @@ class LyricManager @Inject constructor(
      *
      * 写入 netLyricResult（Lyric 结构体，含 lrc/yrc/tlyric/ytlrc 等字段）。
      */
-    private suspend fun fetchNetEaseLyric(id: String) {
+    private suspend fun fetchNetEaseLyric(id: String, loadToken: Long) {
         try {
-            netLyricResult.value = repository.getLyricV1(id)
+            val result = repository.getLyricV1(id)
+            currentCoroutineContext().ensureActive()
+            if (loadSession.canApplyRemote(loadToken)) netLyricResult.value = result
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "NetEase fetch error")
-            netLyricResult.value = Resource.Error("NetEase fetch failed")
+            if (loadSession.canApplyRemote(loadToken)) netLyricResult.value = Resource.Error("NetEase fetch failed")
         }
     }
 
@@ -379,12 +434,16 @@ class LyricManager @Inject constructor(
      *
      * 写入 amLyricResult（原始 TTML 字符串）。
      */
-    private suspend fun fetchAMLLyric(id: String) {
+    private suspend fun fetchAMLLyric(id: String, loadToken: Long) {
         try {
-            amLyricResult.value = repository.getAMLLyric(id)
+            val result = repository.getAMLLyric(id)
+            currentCoroutineContext().ensureActive()
+            if (loadSession.canApplyRemote(loadToken)) amLyricResult.value = result
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "AML fetch error")
-            amLyricResult.value = Resource.Error("AML fetch failed")
+            if (loadSession.canApplyRemote(loadToken)) amLyricResult.value = Resource.Error("AML fetch failed")
         }
     }
 
@@ -398,6 +457,7 @@ class LyricManager @Inject constructor(
      */
     fun fetchQQLyric(song: QQSong) {
         qqFetchJob?.cancel()
+        val loadToken = loadSession.current()
         qqFetchJob = scope.launch {
             currentQQSong = song
             qqLyricResult.value = Resource.Loading
@@ -405,18 +465,20 @@ class LyricManager @Inject constructor(
                 val result = repository.getLyricNew(
                     song.title, song.album, song.artist, song.duration, song.qid.toLong()
                 )
+                currentCoroutineContext().ensureActive()
+                if (!loadSession.canApplyRemote(loadToken)) return@launch
                 qqLyricResult.value = result
                 if (result is Resource.Success) {
                     val qrcT = result.data.musicMusichallSongPlayLyricInfoGetPlayLyricInfo.data.qrcT
                     if (qrcT != 0) {
-                        fetchQQLyricLrc(song)
+                        fetchQQLyricLrc(song, loadToken)
                     }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Timber.e(e, "QQ fetch error")
-                qqLyricResult.value = Resource.Error("QQ fetch failed")
+                if (loadSession.canApplyRemote(loadToken)) qqLyricResult.value = Resource.Error("QQ fetch failed")
             }
         }
     }
@@ -427,11 +489,13 @@ class LyricManager @Inject constructor(
      * 当主歌词是 QRC 逐字格式时，额外拉取纯 LRC 作为兜底（qrc=0, qrcT=0）。
      * 解码后存入 lrcFallbackContent 并触发重合并。
      */
-    private suspend fun fetchQQLyricLrc(song: QQSong) {
+    private suspend fun fetchQQLyricLrc(song: QQSong, loadToken: Long) {
         try {
             val lrcResult = repository.getLyricLrc(
                 song.title, song.album, song.artist, song.duration, song.qid.toLong()
             )
+            currentCoroutineContext().ensureActive()
+            if (!loadSession.canApplyRemote(loadToken)) return
             if (lrcResult is Resource.Success) {
                 val lrcContent = QRCUtils.decodeLyric(
                     lrcResult.data.musicMusichallSongPlayLyricInfoGetPlayLyricInfo.data.lyric
@@ -482,6 +546,8 @@ class LyricManager @Inject constructor(
         am: Resource<String>
     ) {
         val songIdAtStart = currentSongId
+        val loadToken = loadSession.current()
+        if (!loadSession.canApplyRemote(loadToken)) return
 
         // 守卫：三源全 Loading 且已有有效歌词 → 不覆盖
         val hasValidLyrics = _lyricData.value.let {
@@ -494,6 +560,7 @@ class LyricManager @Inject constructor(
             val lyricData: LyricData,
             val cacheContent: String?,
             val cacheTranslation: String?,
+            val cacheRomanization: String?,
             val cacheParserType: String,
             val sources: List<LyricSourceData>
         )
@@ -524,16 +591,20 @@ class LyricManager @Inject constructor(
                 merged.copy(rawLyrics = rawLyrics, rawTranslation = rawTranslation)
             )
 
-            val (cacheContent, cacheTranslation, cacheParserType) = buildCacheInfo(
-                sources,
-                merged
-            )
+            val cacheInfo = buildCacheInfo(sources, merged)
 
-            MergeResult(lyricData, cacheContent, cacheTranslation, cacheParserType, sources)
+            MergeResult(
+                lyricData = lyricData,
+                cacheContent = cacheInfo.content,
+                cacheTranslation = cacheInfo.translation,
+                cacheRomanization = cacheInfo.romanization,
+                cacheParserType = cacheInfo.parserType,
+                sources = sources,
+            )
         }
 
         // 歌曲已切换，放弃旧结果
-        if (currentSongId != songIdAtStart) return
+        if (currentSongId != songIdAtStart || !loadSession.canApplyRemote(loadToken)) return
         if (songIdAtStart == null) return
 
         // 守卫：不拿空结果覆盖已有有效歌词（竞态保护）
@@ -559,6 +630,7 @@ class LyricManager @Inject constructor(
                         songId = songIdAtStart,
                         content = cacheContent,
                         translation = mergeResult.cacheTranslation,
+                        romanization = mergeResult.cacheRomanization,
                         isVerbatim = mergeResult.lyricData.isVerbatim,
                         isPureMusic = mergeResult.lyricData.isPureMusic,
                         sourceName = mergeResult.lyricData.source.name,
@@ -569,13 +641,15 @@ class LyricManager @Inject constructor(
             }
         }
 
+        // Room writes above suspend; a custom save/reload may have happened meanwhile.
+        if (!loadSession.canApplyRemote(loadToken)) return
         // ===== 无逐词时尝试一次多源兜底（AMLL 优先） =====
         if (!wordTimedFallbackRequested &&
             !mergeResult.lyricData.isPureMusic &&
             !hasWordTimedLines(mergeResult.lyricData)
         ) {
             wordTimedFallbackRequested = true
-            scope.launch { attemptWordTimedFallback(songIdAtStart) }
+            wordTimedFallbackJob = scope.launch { attemptWordTimedFallback(songIdAtStart, loadToken) }
         }
 
         // ===== 本地对唱合并（仅在 QQ 源终结后触发一次） =====
@@ -603,9 +677,10 @@ class LyricManager @Inject constructor(
                 } else {
                     duetDetector.singleDuet(netease)
                 }
-                if (dueted != null) {
-                    _lyricData.value = dueted
-                    lyricCache[songIdAtStart] = dueted
+                if (dueted != null && loadSession.canApplyRemote(loadToken)) {
+                    val displayed = applyCustomTranslationOverlay(dueted)
+                    _lyricData.value = displayed
+                    lyricCache[songIdAtStart] = displayed
                 }
             }
 
@@ -665,12 +740,16 @@ class LyricManager @Inject constructor(
                 duration = song.interval
             )
             qqSongRepository.insertSong(qqSong)
+            if (lastMetadata?.stableKey() != metadata.stableKey()) return@launch
 
             // A manual selection is an explicit source switch. Cancel the automatic
             // multi-source load and clear its results so NetEase/AM cannot win the
             // merge again while the selected QQ lyric is being fetched.
             currentSongId = metadata.id.toString()
             lastMetadata = metadata
+            loadSession.begin()
+            currentCustomEntry = null
+            wordTimedFallbackJob?.cancel()
             fetchJob?.cancel()
             qqFetchJob?.cancel()
             qqFinalized = false
@@ -687,14 +766,15 @@ class LyricManager @Inject constructor(
     /**
      * 保存用户编辑的歌词并刷新显示
      */
-    fun saveCustomLyric(
+    suspend fun saveCustomLyric(
         metadata: MediaMetadata,
         lyric: String?,
         translatedLyric: String?,
         matchedSource: String? = null,
         matchedSongId: String? = null,
     ) {
-        scope.launch {
+        withContext(Dispatchers.Main.immediate) {
+            flushUserOffset(metadata)
             customLyricRepository.saveLyric(
                 stableKey = metadata.stableKey(),
                 lyric = lyric,
@@ -702,22 +782,40 @@ class LyricManager @Inject constructor(
                 matchedSource = matchedSource,
                 matchedSongId = matchedSongId,
             )
-            loadLyrics(metadata, forceReload = true)
+            if (lastMetadata?.stableKey() == metadata.stableKey() && currentSongId != null) {
+                loadLyrics(metadata, forceReload = true)
+            }
         }
     }
 
     /**
      * 清除自定义歌词，回退到网络歌词
      */
-    fun clearCustomLyric(metadata: MediaMetadata) {
-        scope.launch {
+    suspend fun clearCustomLyric(metadata: MediaMetadata) {
+        withContext(Dispatchers.Main.immediate) {
+            flushUserOffset(metadata)
             customLyricRepository.clearLyric(metadata.stableKey())
-            loadLyrics(metadata, forceReload = true)
+            if (lastMetadata?.stableKey() == metadata.stableKey() && currentSongId != null) {
+                loadLyrics(metadata, forceReload = true)
+            }
         }
     }
 
+    suspend fun getCustomLyric(metadata: MediaMetadata): CustomLyric? =
+        customLyricRepository.get(metadata.stableKey())
+
     /** 待落库的偏移写入任务（拖动滑杆时防抖） */
-    private var offsetSaveJob: Job? = null
+    private val offsetSaveJobs = mutableMapOf<String, Job>()
+    private val pendingOffsets = mutableMapOf<String, Long>()
+
+    suspend fun flushUserOffset(metadata: MediaMetadata) = withContext(Dispatchers.Main.immediate) {
+        val key = metadata.stableKey()
+        offsetSaveJobs.remove(key)?.cancelAndJoin()
+        pendingOffsets[key]?.let { value ->
+            customLyricRepository.saveOffset(key, value)
+            pendingOffsets.remove(key)
+        }
+    }
 
     /**
      * 设置当前歌曲的用户歌词偏移。
@@ -726,11 +824,22 @@ class LyricManager @Inject constructor(
      */
     fun setUserOffset(metadata: MediaMetadata, offsetMs: Long) {
         val normalized = normalizeLyricOffsetMs(offsetMs)
-        _lyricOffsetMs.value = normalized
-        offsetSaveJob?.cancel()
-        offsetSaveJob = scope.launch {
-            delay(300)
-            customLyricRepository.saveOffset(metadata.stableKey(), normalized)
+        val key = metadata.stableKey()
+        if (lastMetadata?.stableKey() == key) _lyricOffsetMs.value = normalized
+        pendingOffsets[key] = normalized
+        offsetSaveJobs[key]?.cancel()
+        offsetSaveJobs[key] = scope.launch {
+            try {
+                delay(300)
+                customLyricRepository.saveOffset(key, normalized)
+                if (pendingOffsets[key] == normalized) pendingOffsets.remove(key)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Timber.e(error, "Could not save lyric offset")
+            } finally {
+                if (offsetSaveJobs[key] == currentCoroutineContext()[Job]) offsetSaveJobs.remove(key)
+            }
         }
     }
 
@@ -738,6 +847,8 @@ class LyricManager @Inject constructor(
      * 取消当前所有拉取和预加载任务
      */
     fun cancelAll() {
+        loadSession.begin()
+        wordTimedFallbackJob?.cancel()
         fetchJob?.cancel()
         qqFetchJob?.cancel()
         preloadJob?.cancel()
@@ -801,7 +912,8 @@ class LyricManager @Inject constructor(
      * ② 逐词兜底：主流程无逐词时，按 AMLL → 酷狗 → QQ → 网易云
      * 找首个 HIGH 置信度的逐词候选并采用（不做多源合并）。
      */
-    private suspend fun attemptWordTimedFallback(songId: String) {
+    private suspend fun attemptWordTimedFallback(songId: String, loadToken: Long) {
+        if (!loadSession.canApplyRemote(loadToken)) return
         val preferWordTimed = try {
             context.dataStore.data.first()[PreferWordTimedLyricsKey] ?: true
         } catch (_: Exception) {
@@ -832,34 +944,53 @@ class LyricManager @Inject constructor(
             sources = automaticWordTimedLyricSourceOrder.toSet(),
         )
         for (source in sourceOrder) {
+            if (!loadSession.canApplyRemote(loadToken)) return
             val matches = withTimeoutOrNull(WORD_TIMED_FALLBACK_TIMEOUT_MS) {
                 lyricMatcher.matchHighConfidenceForSource(request, source)
             } ?: continue
             val best = matches.firstOrNull { match ->
                 match.confidence == LyricMatchConfidence.HIGH && match.hasWordTiming
             } ?: continue
+            val supplemental = supplementalSecondaryLyrics()
             val data = withContext(Dispatchers.Default) {
                 LyricFormatDetector.parseForDisplay(
                     raw = best.candidate.lyrics,
-                    translatedLyrics = best.candidate.translatedLyrics,
+                    translatedLyrics = best.candidate.translatedLyrics ?: supplemental.first,
                     durationMs = metadata.duration,
+                    romanizationLyrics = supplemental.second,
                 )
             } ?: continue
-            if (currentSongId != songId) return
-            val applied = data.copy(
+            if (currentSongId != songId || !loadSession.canApplyRemote(loadToken)) return
+            val applied = applyCustomTranslationOverlay(data.copy(
                 source = source.toLyricSource(),
                 isPureMusic = _lyricData.value.isPureMusic,
-            )
+            ))
             _lyricData.value = applied
             lyricCache[songId] = applied
-            cacheMatchedLyric(songId, applied)
+            cacheMatchedLyric(songId, applied, supplemental.second)
             Timber.tag(TAG).d("Word-timed fallback adopted ${best.candidate.source} (score=${best.score})")
             return
         }
     }
 
+    /**
+     * 逐字歌词兜底采用的来源（酷狗等）通常没有翻译，从已经拉取到的网易云/QQ 源里
+     * 按时间补齐翻译与音译，粤语/日文歌的副行才有内容可用。
+     */
+    private fun supplementalSecondaryLyrics(): Pair<String?, String?> {
+        val netease = (netLyricResult.value as? Resource.Success)?.data
+        val qq = (qqLyricResult.value as? Resource.Success)?.data
+            ?.musicMusichallSongPlayLyricInfoGetPlayLyricInfo?.data
+        val translation = netease?.ytlrc?.lyric?.takeIf { it.isNotBlank() }
+            ?: netease?.tlyric?.lyric?.takeIf { it.isNotBlank() }
+            ?: qq?.trans?.let { QRCUtils.decodeLyric(it, true) }?.takeIf { it.isNotBlank() }
+        val romanization = netease?.romalrc?.lyric?.takeIf { it.isNotBlank() }
+            ?: qq?.roma?.let { QRCUtils.decodeLyric(it) }?.takeIf { it.isNotBlank() }
+        return translation to romanization
+    }
+
     /** 把兜底采用的逐词歌词写入 Room，重启后仍可用。 */
-    private suspend fun cacheMatchedLyric(songId: String, data: LyricData) {
+    private suspend fun cacheMatchedLyric(songId: String, data: LyricData, romanization: String? = null) {
         val content = data.rawLyrics ?: return
         val parserType = when (LyricFormatDetector.detect(content)) {
             LyricTextFormat.TTML -> "TTML"
@@ -874,6 +1005,7 @@ class LyricManager @Inject constructor(
                 songId = songId,
                 content = content,
                 translation = data.rawTranslation,
+                romanization = romanization,
                 isVerbatim = data.isVerbatim,
                 isPureMusic = data.isPureMusic,
                 sourceName = data.source.name,
@@ -941,20 +1073,28 @@ class LyricManager @Inject constructor(
      * @return Triple(原始歌词文本, 翻译文本, 解析器类型)
      *   对逐字歌词（TTML/YRC/QRC），第一项为 null 表示不缓存
      */
+    private data class LyricCacheInfo(
+        val content: String?,
+        val translation: String?,
+        val romanization: String?,
+        val parserType: String,
+    )
+
     private fun buildCacheInfo(
         sources: List<LyricSourceData>,
         lyricData: LyricData
-    ): Triple<String?, String?, String> {
+    ): LyricCacheInfo {
         return when (lyricData.source) {
-            LyricSource.AM -> Triple(null, null, "TTML")
+            LyricSource.AM -> LyricCacheInfo(null, null, null, "TTML")
             LyricSource.NetEaseCloudMusic -> {
                 val netease = sources.filterIsInstance<LyricSourceData.NetEase>().firstOrNull()
                 if (lyricData.isVerbatim) {
-                    Triple(null, null, "YRC")
+                    LyricCacheInfo(null, null, null, "YRC")
                 } else {
                     val lrc = netease?.lyric?.lrc?.lyric?.takeIf { it.isNotBlank() }
                     val translation = netease?.lyric?.tlyric?.lyric?.takeIf { it.isNotBlank() }
-                    Triple(lrc, translation, "LRC")
+                    val romanization = netease?.lyric?.romalrc?.lyric?.takeIf { it.isNotBlank() }
+                    LyricCacheInfo(lrc, translation, romanization, "LRC")
                 }
             }
 
@@ -963,14 +1103,15 @@ class LyricManager @Inject constructor(
                 val lrc = qq?.lrcContent?.takeIf { it.isNotBlank() }
                     ?: qq?.lyric?.lyric?.takeIf { it.isNotBlank() }
                 val translation = qq?.lyric?.trans?.takeIf { it.isNotBlank() }
+                val romanization = qq?.lyric?.roma?.takeIf { it.isNotBlank() }
                 if (lyricData.isVerbatim) {
-                    Triple(lrc, translation, "QRC")
+                    LyricCacheInfo(lrc, translation, romanization, "QRC")
                 } else {
-                    Triple(lrc, translation, "LRC")
+                    LyricCacheInfo(lrc, translation, romanization, "LRC")
                 }
             }
 
-            else -> Triple(null, null, "LRC")
+            else -> LyricCacheInfo(null, null, null, "LRC")
         }
     }
 
@@ -994,15 +1135,16 @@ class LyricManager @Inject constructor(
         },
         lyricLine = when (parserType) {
             "TTML" -> TTMLParser().parse(content)
-            "YRC" -> YRCParser.parse(content, translation ?: "")
+            "YRC" -> YRCParser.parse(content, translation ?: "", romanization)
             "QRC" -> {
                 val decoded = translation?.let { QRCUtils.decodeLyric(it) } ?: ""
-                QRCParser.parse(content, decoded)
+                val decodedRoma = romanization?.let { QRCUtils.decodeLyric(it) }
+                QRCParser.parse(content, decoded, decodedRoma)
             }
 
-            "ENHANCED_LRC" -> EnhancedLRCParser.parse(content, translation)
+            "ENHANCED_LRC" -> EnhancedLRCParser.parse(content, translation, romanization)
 
-            else -> LRCParser.parse(content, translation)
+            else -> LRCParser.parse(content, translation, romanization)
         },
         rawLyrics = content,
         rawTranslation = translation,

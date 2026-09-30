@@ -7,6 +7,7 @@ import com.ljyh.mei.di.repository.AlbumsRepository
 import com.ljyh.mei.di.repository.CachedLyricRepository
 import com.ljyh.mei.di.repository.ColorRepository
 import com.ljyh.mei.di.repository.DownloadRepository
+import com.ljyh.mei.di.repository.FavoritesRepository
 import com.ljyh.mei.di.repository.HistoryRepository
 import com.ljyh.mei.di.repository.LikeRepository
 import com.ljyh.mei.di.repository.LocalPlaylistRepository
@@ -71,6 +72,10 @@ object AppModule {
     @Provides @Singleton
     fun provideCustomLyricDao(db: AppDatabase): CustomLyricRepository =
         CustomLyricRepository(db.customLyricDao())
+
+    @Provides @Singleton
+    fun provideFavoritesRepository(db: AppDatabase): FavoritesRepository =
+        FavoritesRepository(db.songDao(), db.playlistSongCrossRefDao())
 
     @Provides @Singleton
     fun provideGson(): Gson = Gson()

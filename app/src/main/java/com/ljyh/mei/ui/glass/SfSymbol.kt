@@ -49,6 +49,7 @@ enum class SfSymbol(
     MusicNoteList("music.note.list", 0x10046C),
     Microphone("mic", 0x1002B0),
     Heart("heart", 0x1002B4),
+    HeartFilled("heart.fill", 0x1002B5),
     Star("star", 0x1002C2),
     StarFilled("star.fill", 0x1002C3),
     Download("arrow.down.circle", 0x100078),

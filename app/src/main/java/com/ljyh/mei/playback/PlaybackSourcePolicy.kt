@@ -17,54 +17,42 @@ internal fun effectivePlaybackQuality(sourceQuality: String?, attemptedQuality: 
         ?.let(::normalizePlaybackQuality)
         ?: normalizePlaybackQuality(attemptedQuality)
 
-/**
- * Returns the requested quality followed by the progressively lower qualities
- * supported by the NetEase player endpoint.
- */
-internal fun playbackQualityFallbacks(requestedQuality: String): List<String> = when (
-    normalizePlaybackQuality(requestedQuality)
-) {
-    MusicQuality.STANDARD.text -> listOf(MusicQuality.STANDARD.text)
-    MusicQuality.EXHIGH.text -> listOf(
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
-    MusicQuality.LOSSLESS.text -> listOf(
-        MusicQuality.LOSSLESS.text,
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
-    MusicQuality.HIRES.text -> listOf(
-        MusicQuality.HIRES.text,
-        MusicQuality.LOSSLESS.text,
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
-    MusicQuality.JYEFFECT.text -> listOf(
-        MusicQuality.JYEFFECT.text,
-        MusicQuality.LOSSLESS.text,
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
-    MusicQuality.SKY.text -> listOf(
-        MusicQuality.SKY.text,
-        MusicQuality.JYEFFECT.text,
-        MusicQuality.LOSSLESS.text,
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
-    MusicQuality.JYMASTER.text -> listOf(
-        MusicQuality.JYMASTER.text,
-        MusicQuality.HIRES.text,
-        MusicQuality.LOSSLESS.text,
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
-    else -> listOf(
-        MusicQuality.EXHIGH.text,
-        MusicQuality.STANDARD.text,
-    )
+// Adapted from NeriPlayer's PlayerUrlResolver (GPL-3.0).
+internal val playbackQualityOrder = listOf(
+    "jymaster", "sky", "jyeffect", "hires", "lossless", "exhigh", "higher", "standard",
+)
+
+/** Returns the requested quality followed by progressively lower supported qualities. */
+internal fun playbackQualityFallbacks(requestedQuality: String): List<String> {
+    val quality = normalizePlaybackQuality(requestedQuality)
+    val index = playbackQualityOrder.indexOf(quality)
+    return if (index >= 0) playbackQualityOrder.drop(index)
+    else listOf(quality, "exhigh", "higher", "standard").distinct()
 }
+
+/** Prefer the selected quality, then lower ones; other cached qualities are a last resort. */
+internal fun selectCachedPlaybackKey(
+    keys: Set<String>,
+    mediaId: String,
+    requestedQuality: String,
+    allowOtherQualities: Boolean,
+    isComplete: (String) -> Boolean,
+): String? {
+    val preferred = normalizePlaybackQuality(requestedQuality)
+    val qualities = if (allowOtherQualities) {
+        (playbackQualityFallbacks(preferred) + playbackQualityOrder).distinct()
+    } else listOf(preferred)
+    for (quality in qualities) {
+        val prefix = playbackCacheKeyPrefix(mediaId, quality)
+        keys.asSequence().filter { it.startsWith(prefix) }.sorted()
+            .firstOrNull(isComplete)?.let { return it }
+    }
+    return null
+}
+
+/** Login/permission/unavailable-quality responses can still have a playable lower level. */
+internal fun shouldTryLowerPlaybackQuality(responseCode: Int): Boolean =
+    responseCode in setOf(200, 301, 401, 403, 404)
 
 /** Identifies the exact media bytes returned for a logical quality. */
 internal fun playbackSourceIdentity(sourceMd5: String?, sourceSize: Long?): String =

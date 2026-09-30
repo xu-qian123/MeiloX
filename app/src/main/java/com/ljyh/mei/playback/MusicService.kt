@@ -770,42 +770,67 @@ class MusicService : MediaLibraryService(),
 
     private fun createDataSourceFactory(): DataSource.Factory {
         val simpleCache = CacheManager.getSimpleCache(context)
-
-        return ResolvingDataSource.Factory(getCacheDataSourceFactory(context)) { dataSpec ->
-            val mediaId = dataSpec.key ?: error("No media key")
-            val quality = context.dataStore[MusicQualityKey]
-                ?.let(::normalizePlaybackQuality)
-                ?: MusicQuality.EXHIGH.text
-            val localFilePath = runBlocking {
-                val song = songRepository.getSong(mediaId).firstOrNull()
-                    ?: songRepository.getSong("local_$mediaId").firstOrNull()
-                song?.path
-            }
-            if (localFilePath != null) {
-                val file = File(localFilePath)
-                if (file.exists()) {
-                    Timber.tag("ResolvingDataSource").d("Using local file for mediaId: $mediaId, filePath: ${file.path}")
-                    return@Factory dataSpec.buildUpon()
-                        .setUri(Uri.fromFile(file))
-                        .setKey(null)
-                        .build()
+        val cacheFactory = getCacheDataSourceFactory(context)
+        return DataSource.Factory {
+            // Keep the chosen representation for seeks/reopens of this data source.
+            // Switching quality mid-file would apply byte offsets to different audio bytes.
+            var selectedCache: Pair<Pair<String, String>, String>? = null
+            ResolvingDataSource(cacheFactory.createDataSource(), ResolvingDataSource.Resolver { dataSpec ->
+                val mediaId = dataSpec.key ?: error("No media key")
+                val quality = context.dataStore[MusicQualityKey]
+                    ?.let(::normalizePlaybackQuality) ?: MusicQuality.EXHIGH.text
+                val identity = mediaId to quality
+                val localPath = runBlocking {
+                    songRepository.getSong(mediaId).firstOrNull()?.path
+                        ?: songRepository.getSong("local_$mediaId").firstOrNull()?.path
                 }
-            }
-            val fullyCachedKey = findFullyCachedPlaybackKey(simpleCache, mediaId, quality)
-            if (fullyCachedKey != null) {
-                Timber.tag("ResolvingDataSource").d("Fully cached on disk: $mediaId")
-                return@Factory dataSpec.buildUpon()
-                    .setKey(fullyCachedKey)
-                    .build()
-            }
-
-            runBlocking {
-                val resolved = mediaUriProvider.resolveMediaSource(mediaId, quality)
-                dataSpec.buildUpon()
-                    .setUri(resolved.uri)
-                    .setKey(resolved.cacheKey)
-                    .build()
-            }
+                val localUri = localPath?.let { path ->
+                    when {
+                        path.startsWith("content://") -> Uri.parse(path)
+                        File(path).isFile -> Uri.fromFile(File(path))
+                        else -> null
+                    }
+                }
+                if (localUri != null) {
+                    return@Resolver dataSpec.buildUpon().setUri(localUri).setKey(null).build()
+                }
+                fun cachedSource(key: String): ResolvedMediaSource {
+                    selectedCache = identity to key
+                    // No signed URL is needed to read complete cached bytes.
+                    return ResolvedMediaSource(Uri.parse("meilox-cache:///$mediaId"), quality, key)
+                }
+                val pinnedKey = selectedCache?.takeIf { it.first == identity }?.second
+                if (pinnedKey != null) {
+                    if (!CacheManager.isContentFullyCached(simpleCache, pinnedKey)) {
+                        throw java.io.IOException("Selected offline cache is no longer complete: $mediaId")
+                    }
+                    return@Resolver dataSpec.buildUpon()
+                        .setUri(Uri.parse("meilox-cache:///$mediaId")).setKey(pinnedKey).build()
+                }
+                val connectivity = context.getSystemService(android.net.ConnectivityManager::class.java)
+                val capabilities = connectivity?.getNetworkCapabilities(connectivity.activeNetwork)
+                val online = capabilities?.hasCapability(
+                    android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED,
+                ) == true
+                val resolved = runBlocking {
+                    resolvePlaybackWithCache(
+                        networkAvailable = online,
+                        preferredCache = {
+                            findFullyCachedPlaybackKey(simpleCache, mediaId, quality)?.let(::cachedSource)
+                        },
+                        fallbackCache = {
+                            // Only choose another representation at the start of a load.
+                            if (dataSpec.position == 0L) {
+                                findFullyCachedPlaybackKey(
+                                    simpleCache, mediaId, quality, allowOtherQualities = true,
+                                )?.let(::cachedSource)
+                            } else null
+                        },
+                        remote = { mediaUriProvider.resolveMediaSource(mediaId, quality) },
+                    )
+                }
+                dataSpec.buildUpon().setUri(resolved.uri).setKey(resolved.cacheKey).build()
+            })
         }
     }
 

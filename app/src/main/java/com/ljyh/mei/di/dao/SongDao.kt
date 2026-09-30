@@ -85,6 +85,13 @@ interface SongDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSongs(songs: List<Song>)
 
+    /**
+     * 只补缺失的歌曲行：喜欢列表同步时不能覆盖已有的本地/已下载行
+     * （它们的 sourceType / path 等字段不能被网络元数据冲掉）。
+     */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertSongsIfAbsent(songs: List<Song>)
+
     @Query("DELETE FROM song WHERE id = :id")
     suspend fun deleteById(id: String)
 }

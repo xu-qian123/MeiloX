@@ -3,16 +3,12 @@ package com.ljyh.mei.ui.component.player.component.classic.component
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
@@ -30,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.ljyh.mei.R
 import com.ljyh.mei.data.model.MediaMetadata
+import com.ljyh.mei.ui.component.player.component.FavoriteHeartButton
 import com.ljyh.mei.ui.glass.SfIcon
 import com.ljyh.mei.ui.glass.SfSymbol
 
@@ -39,8 +37,8 @@ fun PlayerHeader(
     mediaMetadata: MediaMetadata,
     isLiked: Boolean,
     onClick: () -> Unit,
-    onMoreClick: () -> Unit,
     onLikeClick: () -> Unit,
+    onMoreClick: (() -> Unit)? = null,
     iconColor: Color = Color.White
 ) {
 
@@ -119,46 +117,27 @@ fun PlayerHeader(
             }
         }
 
+        // 收藏按钮（手机端「更多」已移至底部功能栏；平板端没有功能栏，仍保留在标题行）
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.padding(horizontal = 10.dp)
         ) {
-            IconButton(
+            FavoriteHeartButton(
+                isLiked = isLiked,
                 onClick = onLikeClick,
-                modifier = Modifier
-                    .size(34.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .requiredSize(34.dp)
-                        .background(Color.White.copy(alpha = 0.15f), CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    SfIcon(
-                        symbol = if (isLiked) SfSymbol.StarFilled else SfSymbol.Star,
-                        contentDescription = stringResource(R.string.app_tab_library_songs),
-                        tint = iconColor.copy(alpha = 0.8f),
-                        size = 22.dp,
-                        weight = FontWeight.Bold
-                    )
-                }
-            }
-            // 右侧：更多按钮
-            IconButton(
-                onClick = onMoreClick,
-                modifier = Modifier
-                    .size(34.dp),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .requiredSize(34.dp)
-                        .background(Color.White.copy(alpha = 0.15f), CircleShape),
-                    contentAlignment = Alignment.Center,
+                unlikedTint = iconColor.copy(alpha = 0.8f),
+            )
+
+            if (onMoreClick != null) {
+                IconButton(
+                    onClick = onMoreClick,
+                    modifier = Modifier.size(34.dp),
                 ) {
                     SfIcon(
                         symbol = SfSymbol.Ellipsis,
                         contentDescription = stringResource(R.string.more_actions_title),
+                        modifier = Modifier.graphicsLayer { rotationZ = 90f },
                         tint = iconColor.copy(alpha = 0.8f),
                         size = 22.dp,
                     )

@@ -5,6 +5,13 @@ MeiloX is distributed under the GNU General Public License, version 3 (see
 LICENSE). The components below remain under their own terms. This file is a
 notice and does not replace any upstream license text.
 
+NeriPlayer playback policies
+---------------------------
+The playback quality fallback order and cache span integrity checks are adapted
+from the local NeriPlayer project's PlayerUrlResolver.kt and
+PlayerManagerUrlExtensions.kt, licensed under the GNU General Public License,
+version 3. These adaptations retain MeiloX's source-specific cache identities.
+
 AndroidLiquidGlass / Backdrop
 -----------------------------
 The `io.github.kyant0:backdrop:2.0.0` dependency is from AndroidLiquidGlass:

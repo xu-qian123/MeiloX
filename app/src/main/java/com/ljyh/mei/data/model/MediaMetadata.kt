@@ -60,14 +60,13 @@ const val PLACEHOLDER_URI = "https://placeholder.media"
 
 /**
  * Identity used by custom lyrics and per-song lyric preferences.
- * Mirrors NeriPlayer's `stableKey` (`id|album|mediaUri`) with the fields
- * MeiloX carries; [MediaMetadata.originId] keeps local tracks stable.
+ *
+ * 只使用歌曲身份（originId ?: id）。播放器元数据里的 `album.id` 会随入口和播放快照
+ * 恢复在「真实专辑 id / 0 / 专辑名哈希」之间变化，一旦参与主键，同一首歌就会命中不到
+ * 之前保存的记录（自定义歌词看起来"丢失"）。[MediaMetadata.originId] 保证本地曲目稳定。
  */
-fun MediaMetadata.stableKey(): String = buildString {
-    append(originId?.takeIf { it.isNotBlank() } ?: id.toString())
-    append('|')
-    append(album.id)
-}
+fun MediaMetadata.stableKey(): String =
+    originId?.takeIf { it.isNotBlank() } ?: id.toString()
 
 fun PlaylistDetail.Playlist.Track.toMediaMetadata() = MediaMetadata(
     id = id,

@@ -45,7 +45,7 @@ fun PlayerActionSettingsSheet(onDismiss: () -> Unit) {
         ) {
             IosListRow(
                 title = stringResource(R.string.player_action_visible),
-                detail = "${selected.size}/5",
+                detail = "${selected.size}/${PlayerAction.MAX_VISIBLE}",
                 showTopSeparator = false,
             )
             selected.forEach { action ->
@@ -61,7 +61,7 @@ fun PlayerActionSettingsSheet(onDismiss: () -> Unit) {
             IosListRow(title = stringResource(R.string.player_action_available))
             available.forEach { action ->
                 PlayerActionRow(action, selected = false) {
-                            if (selected.size < 5) {
+                            if (selected.size < PlayerAction.MAX_VISIBLE) {
                                 selected.add(action)
                                 save()
                             } else {

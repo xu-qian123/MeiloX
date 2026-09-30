@@ -49,7 +49,7 @@ fun mergeLyrics(sources: List<LyricSourceData>, isPureMusic: Boolean = false): L
                     isVerbatim = true,
                     isPureMusic = isPureMusic,
                     source = LyricSource.NetEaseCloudMusic,
-                    lyricLine = YRCParser.parse(yrc, translation)
+                    lyricLine = YRCParser.parse(yrc, translation, n.romalrc?.lyric)
                 )
             }
         }
@@ -65,7 +65,7 @@ fun mergeLyrics(sources: List<LyricSourceData>, isPureMusic: Boolean = false): L
                 isVerbatim = true,
                 isPureMusic = isPureMusic,
                 source = LyricSource.QQMusic,
-                lyricLine = QRCParser.parse(q.lyric, q.trans)
+                lyricLine = QRCParser.parse(q.lyric, q.trans, q.roma)
             )
         }
         // 有些情况下 QQ 有逐字但没有 trans（视为非完整逐字），上面判断要求 trans 存在
@@ -82,7 +82,7 @@ fun mergeLyrics(sources: List<LyricSourceData>, isPureMusic: Boolean = false): L
                 isVerbatim = false,
                 isPureMusic = isPureMusic,
                 source = LyricSource.NetEaseCloudMusic,
-                lyricLine = LRCParser.parse(lrc, n.tlyric?.lyric)
+                lyricLine = LRCParser.parse(lrc, n.tlyric?.lyric, n.romalrc?.lyric)
             )
         }
     }
@@ -97,7 +97,7 @@ fun mergeLyrics(sources: List<LyricSourceData>, isPureMusic: Boolean = false): L
                 isVerbatim = false,
                 isPureMusic = isPureMusic,
                 source = LyricSource.QQMusic,
-                lyricLine = LRCParser.parse(lrcText, q.trans)
+                lyricLine = LRCParser.parse(lrcText, q.trans, q.roma)
             )
         }
     }

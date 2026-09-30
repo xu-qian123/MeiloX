@@ -17,6 +17,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -24,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,10 +57,14 @@ fun PlayerActionToolbar(
     val playerConnection = LocalPlayerConnection.current ?: return
     val context = LocalContext.current
 
-    val (actionString, _) = rememberPreference(
+    val (actionString, setActionString) = rememberPreference(
         key = PlayerActionKey,
         defaultValue = PlayerAction.toSettings(PlayerAction.defaultActions)
     )
+    // 「更多」从标题栏移到功能栏后，旧配置缺少它时自动补一次。
+    LaunchedEffect(actionString) {
+        PlayerAction.migrateMissingMore(actionString)?.let { setActionString(it) }
+    }
     val actions = remember(actionString) {
         val actions = PlayerAction.fromSettings(actionString)
         Timber.tag("PlayerActionToolbar").d(actionString)
@@ -178,7 +184,13 @@ fun PlayerActionToolbar(
                     ShadowedIconButton(
                         onClick = onMoreClick
                     ) {
-                        SfIcon(action.systemName, stringResource(action.labelRes), tint = Color.White)
+                        // SF 字体只有横向省略号，旋转 90° 呈现竖向三点。
+                        SfIcon(
+                            systemName = action.systemName,
+                            contentDescription = stringResource(action.labelRes),
+                            modifier = Modifier.graphicsLayer { rotationZ = 90f },
+                            tint = Color.White,
+                        )
                     }
                 }
             }

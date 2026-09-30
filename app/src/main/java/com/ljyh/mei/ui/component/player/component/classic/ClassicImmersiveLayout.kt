@@ -98,6 +98,11 @@ fun ClassicImmersiveLayout(
             lyricData = lyricLine,
             playerConnection = stateContainer.playerConnection,
             lyricOffsetMs = stateContainer.lyricOffsetMs.value,
+            previewPositionMs = stateContainer.seekPreviewPositionMs,
+            secondaryLineModeOverride = stateContainer.secondaryLineModeOverride,
+            onSecondaryLineModeOverrideChange = {
+                stateContainer.secondaryLineModeOverride = it
+            },
             modifier = Modifier
                 .weight(0.45f)
                 .fillMaxHeight()

@@ -609,4 +609,9 @@
     <string name="system_lyrics_enabled">啟用歌詞分享</string>
     <string name="system_lyrics_description">透過 Lyricon Provider 和 SuperLyricApi SDK 分享歌詞及播放狀態。</string>
     <string name="system_lyrics_usage">已接入 Lyricon Provider 和 SuperLyricApi SDK。</string>
+    <string name="lyrics_secondary_translation_short">譯</string>
+    <string name="lyrics_secondary_phonetic_short">音</string>
+    <string name="lyrics_editor_load_failed">讀取已儲存歌詞失敗，請重試後再編輯。</string>
+    <string name="lyrics_editor_save_failed">歌詞儲存失敗，編輯內容已保留，請重試。</string>
+    <string name="lyrics_editor_retry">重試</string>
 </resources>

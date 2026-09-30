@@ -102,11 +102,11 @@ fun PlayerTableControls(
                     },
                     modifier = Modifier.size(84.dp).align(Alignment.Center).clip(ContinuousRoundedRectangle(4.dp)),
                 ) {
-                    SfIcon(
-                        systemName = if (playbackState == STATE_ENDED) "arrow.counterclockwise" else if (isPlaying) "pause.fill" else "play.fill",
+                    PlayPauseIndicator(
+                        isPlaying = isPlaying,
+                        playbackState = playbackState,
                         contentDescription = null,
-                        tint = Color.White,
-                        size = 48.dp,
+                        iconSize = 48.dp,
                     )
                 }
             }

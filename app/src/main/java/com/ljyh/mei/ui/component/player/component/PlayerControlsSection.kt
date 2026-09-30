@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import com.ljyh.mei.constants.PlayerHorizontalPadding
 import com.ljyh.mei.constants.ProgressBarStyle
@@ -36,7 +37,11 @@ fun PlayerControlsSection(
     onAddToPlaylistClick: () -> Unit,
     onDownloadClick: () -> Unit,
     onMoreClick: () -> Unit,
-    isCompact: Boolean = false // 新增参数
+    isCompact: Boolean = false, // 新增参数
+    previewPositionMs: Long? = null,
+    onSeekPreviewStart: ((Long) -> Unit)? = null,
+    onSeekPreviewMove: ((Long) -> Unit)? = null,
+    onSeekPreviewEnd: ((Long?) -> Unit)? = null,
 ) {
     // 紧凑模式下间距减半
     val spacerHeight = if (isCompact) 8.dp else 24.dp
@@ -51,30 +56,29 @@ fun PlayerControlsSection(
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        if (progressBarStyle == ProgressBarStyle.LINEAR) {
-            FluidProgressSlider(
-                position = sliderPosition.toLong(),
-                duration = duration,
-                onPositionChange = { newPosition ->
-                    playerConnection.player.seekTo(newPosition)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PlayerHorizontalPadding + 8.dp)
-            )
-        } else {
-            PlayerProgressSlider(
-                position = sliderPosition.toLong(),
-                duration = duration,
-                isPlaying = isPlaying, // 波浪进度条需要这个参数
-                onPositionChange = { newPosition ->
-                    playerConnection.player.seekTo(newPosition)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = PlayerHorizontalPadding + 8.dp)
-            )
-        }
+        AppleMusicProgressSlider(
+            position = sliderPosition.toLong(),
+            duration = duration,
+            isPlaying = isPlaying,
+            onPositionChange = { newPosition ->
+                playerConnection.player.seekTo(newPosition)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = PlayerHorizontalPadding + 8.dp),
+            trackStyle = if (progressBarStyle == ProgressBarStyle.LINEAR) {
+                AppleMusicSliderTrackStyle.Solid
+            } else {
+                AppleMusicSliderTrackStyle.Wave
+            },
+            isPlaybackWaiting = playbackState == Player.STATE_BUFFERING,
+            playbackSpeed = playerConnection.player.playbackParameters.speed,
+            playbackSessionKey = playerConnection.player.currentMediaItem?.mediaId,
+            previewPositionMs = previewPositionMs,
+            onSeekPreviewStart = onSeekPreviewStart,
+            onSeekPreviewMove = onSeekPreviewMove,
+            onSeekPreviewEnd = onSeekPreviewEnd,
+        )
 
 
         Spacer(Modifier.height(spacerHeight))

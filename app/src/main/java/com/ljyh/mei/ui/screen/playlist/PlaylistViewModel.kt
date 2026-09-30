@@ -182,7 +182,7 @@ class PlaylistViewModel @Inject constructor(
                     is Resource.Success -> {
                         val existingPlaylists = localPlaylistRepository.getPlaylistByAuthor(userId)
                         val existingMap = existingPlaylists.associateBy { it.id }
-                        val playlistsToInsert = result.data.playlist.map {
+                        val playlistsToInsert = result.data.playlist.mapIndexed { index, it ->
                             val existing = existingMap[it.id.toString()]
                             Playlist(
                                 id = it.id.toString(),
@@ -194,7 +194,8 @@ class PlaylistViewModel @Inject constructor(
                                 count = it.trackCount,
                                 playCount = it.playCount,
                                 lastPlayTime = existing?.lastPlayTime ?: 0L,
-                                localPlayCount = existing?.localPlayCount ?: 0
+                                localPlayCount = existing?.localPlayCount ?: 0,
+                                sortOrder = index,
                             )
                         }
                         localPlaylistRepository.insertPlaylists(playlistsToInsert)

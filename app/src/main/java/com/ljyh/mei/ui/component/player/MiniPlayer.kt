@@ -60,6 +60,7 @@ import com.ljyh.mei.constants.NavigationBarHeight
 import com.ljyh.mei.constants.ThumbnailCornerRadius
 import com.ljyh.mei.data.model.MediaMetadata
 import com.ljyh.mei.extensions.togglePlayPause
+import com.ljyh.mei.ui.component.player.component.PlayPauseIndicator
 import com.ljyh.mei.ui.glass.GlassSurface
 import com.ljyh.mei.ui.glass.GlassSurfaceStyle
 import com.ljyh.mei.ui.glass.LocalGlassBackdrop
@@ -185,18 +186,17 @@ fun MiniPlayer(
                         }
                     },
                 ) {
-                    SfIcon(
-                        symbol = when {
-                            playbackState == Player.STATE_ENDED -> SfSymbol.ArrowClockwise
-                            isPlaying -> SfSymbol.PauseFilled
-                            else -> SfSymbol.PlayFilled
-                        },
+                    PlayPauseIndicator(
+                        isPlaying = isPlaying,
+                        playbackState = playbackState,
                         contentDescription = stringResource(
                             if (isPlaying) R.string.player_pause else R.string.player_play,
                         ),
                         tint = MaterialTheme.colorScheme.onSurface,
-                        size = 22.dp,
-                        weight = FontWeight.SemiBold,
+                        iconSize = 22.dp,
+                        iconWeight = FontWeight.SemiBold,
+                        waitingIndicatorSize = 18.dp,
+                        waitingStrokeWidth = 2.dp,
                     )
                 }
 

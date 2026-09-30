@@ -29,7 +29,7 @@ object EnhancedLRCParser : ILyricsParser {
     private const val DEFAULT_LINE_DURATION_MS = 5_000
     private const val DEFAULT_TAIL_DURATION_MS = 500
 
-    fun parse(enhancedLrc: String, translationLrc: String?): SyncedLyrics {
+    fun parse(enhancedLrc: String, translationLrc: String?, romanizationLrc: String? = null): SyncedLyrics {
         val parsedLines = LrcMetadataHelper.removeAttributes(enhancedLrc.lines())
             .mapNotNull(::parseLine)
             .sortedBy { it.lineStart }
@@ -37,7 +37,7 @@ object EnhancedLRCParser : ILyricsParser {
             buildKaraokeLine(line, parsedLines.getOrNull(index + 1)?.lineStart)
         }
         val mergedLines = TranslationHelper.merge(builtLines, translationLrc)
-        return SyncedLyrics(lines = mergedLines)
+        return SyncedLyrics(lines = mergedLines.withRomanization(romanizationLrc))
     }
 
     override fun canParse(content: String): Boolean = content.lineSequence().any { line ->

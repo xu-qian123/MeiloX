@@ -638,4 +638,9 @@
     <string name="lyrics_match_confidence_high">高</string>
     <string name="lyrics_match_confidence_medium">中</string>
     <string name="lyrics_match_confidence_low">低</string>
+    <string name="lyrics_secondary_translation_short">译</string>
+    <string name="lyrics_secondary_phonetic_short">音</string>
+    <string name="lyrics_editor_load_failed">读取已保存歌词失败，请重试后再编辑。</string>
+    <string name="lyrics_editor_save_failed">歌词保存失败，编辑内容已保留，请重试。</string>
+    <string name="lyrics_editor_retry">重试</string>
 </resources>

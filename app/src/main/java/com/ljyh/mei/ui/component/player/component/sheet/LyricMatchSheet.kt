@@ -1,6 +1,5 @@
 package com.ljyh.mei.ui.component.player.component.sheet
 
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,31 +14,27 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogWindowProvider
 import coil3.compose.AsyncImage
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.kyant.shapes.Capsule
@@ -65,7 +60,6 @@ import com.ljyh.mei.utils.lyric.match.RankedLyricMatch
  * plain list) with the matcher's source/confidence/word-timing tags; tapping a
  * candidate applies it immediately as the custom lyric.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LyricMatchSheet(
     viewModel: PlayerViewModel,
@@ -75,27 +69,17 @@ fun LyricMatchSheet(
     val context = LocalContext.current
     val colors = LocalGlassColors.current
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
-    // Keep the dialog window static while the IME animates: only the inner content is
-    // re-padded, so the glass surface never resizes or re-records its backdrop.
-    val view = LocalView.current
-    DisposableEffect(Unit) {
-        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
-        val previousMode = dialogWindow?.attributes?.softInputMode
-        if (dialogWindow != null) {
-            dialogWindow.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING)
-        }
-        onDispose {
-            if (dialogWindow != null && previousMode != null) {
-                dialogWindow.setSoftInputMode(previousMode)
-            }
-        }
-    }
 
+    val saveScope = rememberCoroutineScope()
+    var isSaving by remember { mutableStateOf(false) }
     val dismissSheet: () -> Unit = {
-        viewModel.clearLyricMatches()
-        onDismiss()
+        if (!isSaving) {
+            viewModel.clearLyricMatches()
+            onDismiss()
+        }
     }
-    val applyMatch: (RankedLyricMatch) -> Unit = { match ->
+    val applyMatch: (RankedLyricMatch) -> Unit = apply@{ match ->
+        if (isSaving) return@apply
         val sanitized = sanitizeMatchedLyrics(
             lyrics = match.candidate.lyrics,
             translatedLyrics = match.candidate.translatedLyrics,
@@ -103,30 +87,35 @@ fun LyricMatchSheet(
             artist = metadata.artists.joinToString(" ") { it.name },
             album = metadata.album.title,
         )
-        viewModel.saveCustomLyric(
-            metadata = metadata,
-            lyric = sanitized.lyrics.takeIf { it.isNotBlank() },
-            translatedLyric = sanitized.translatedLyrics,
-            matchedSource = match.candidate.source.name,
-            matchedSongId = match.candidate.id,
-        )
-        Toast.makeText(
-            context,
-            context.getString(R.string.lyrics_match_applied),
-            Toast.LENGTH_SHORT,
-        ).show()
-        dismissSheet()
+        isSaving = true
+        saveScope.launch {
+            try {
+                viewModel.saveCustomLyric(
+                    metadata = metadata,
+                    lyric = sanitized.lyrics.takeIf { it.isNotBlank() },
+                    translatedLyric = sanitized.translatedLyrics,
+                    matchedSource = match.candidate.source.name,
+                    matchedSongId = match.candidate.id,
+                )
+                Toast.makeText(context, R.string.lyrics_match_applied, Toast.LENGTH_SHORT).show()
+                viewModel.clearLyricMatches()
+                onDismiss()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                Toast.makeText(context, R.string.lyrics_editor_save_failed, Toast.LENGTH_LONG).show()
+            } finally {
+                isSaving = false
+            }
+        }
     }
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val animationScope = rememberCoroutineScope()
     val interactiveHighlight = remember(animationScope) {
         InteractiveHighlight(animationScope = animationScope)
     }
 
-    ModalBottomSheet(
+    LyricInputDialog(
         onDismissRequest = dismissSheet,
-        sheetState = sheetState,
         modifier = Modifier.graphicsLayer {
             clip = false
             applyGlassDragScale(
@@ -134,12 +123,7 @@ fun LyricMatchSheet(
                 offset = interactiveHighlight.offset,
             )
         },
-        containerColor = Color.Transparent,
-        contentColor = colors.content,
-        shape = RectangleShape,
-        dragHandle = null,
-        contentWindowInsets = { WindowInsets.statusBars },
-    ) {
+    ) { dragHandleModifier ->
         IosSheetSurface(
             modifier = Modifier.fillMaxWidth().height(screenHeight * 0.82f),
             shape = IosModalSheetShape,
@@ -152,7 +136,7 @@ fun LyricMatchSheet(
                     .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime)),
             ) {
                 Box(
-                    Modifier.fillMaxWidth().height(16.dp),
+                    Modifier.fillMaxWidth().height(24.dp).then(dragHandleModifier),
                     contentAlignment = Alignment.TopCenter,
                 ) {
                     Box(

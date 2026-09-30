@@ -79,6 +79,7 @@ object LyricFormatDetector {
         raw: String,
         translatedLyrics: String?,
         durationMs: Long = 0L,
+        romanizationLyrics: String? = null,
     ): LyricData? {
         if (raw.isBlank()) return null
         val normalized = normalizeLegacyLrcTimestamps(raw)
@@ -89,13 +90,14 @@ object LyricFormatDetector {
         val parsed = runCatching {
             when (format) {
                 LyricTextFormat.TTML -> TTMLParser().parse(normalized)
-                LyricTextFormat.YRC -> YRCParser.parse(normalized, translation)
-                LyricTextFormat.QRC -> QRCParser.parse(normalized, translation)
-                LyricTextFormat.ENHANCED_LRC -> EnhancedLRCParser.parse(normalized, translation)
-                LyricTextFormat.LRC -> LRCParser.parse(normalized, translation)
+                LyricTextFormat.YRC -> YRCParser.parse(normalized, translation, romanizationLyrics)
+                LyricTextFormat.QRC -> QRCParser.parse(normalized, translation, romanizationLyrics)
+                LyricTextFormat.ENHANCED_LRC -> EnhancedLRCParser.parse(normalized, translation, romanizationLyrics)
+                LyricTextFormat.LRC -> LRCParser.parse(normalized, translation, romanizationLyrics)
                 LyricTextFormat.PLAIN -> LRCParser.parse(
                     plainLyricsToPseudoLrc(normalized, durationMs),
                     translation,
+                    romanizationLyrics,
                 )
             }
         }.getOrNull() ?: return null

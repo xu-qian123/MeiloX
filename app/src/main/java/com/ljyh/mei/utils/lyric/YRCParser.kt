@@ -14,10 +14,10 @@ object YRCParser : ILyricsParser {
     private val BG_LINE_REGEX = Regex("""^\[bg:(.*)\](.*)${'$'}""")
     private val translationLineRegex = "\\[(\\d{2}):(\\d{2})[.:](\\d{2,3})\\].*".toRegex()
 
-    fun parse(yrcLyrics: String, translationLrc: String?): SyncedLyrics {
+    fun parse(yrcLyrics: String, translationLrc: String?, romanizationLrc: String? = null): SyncedLyrics {
         val karaokeLines = parseInternal(yrcLyrics.lineSequence())
         val mergedLines = TranslationHelper.merge(karaokeLines, translationLrc)
-        return SyncedLyrics(lines = mergedLines)
+        return SyncedLyrics(lines = mergedLines.withRomanization(romanizationLrc))
     }
 
     override fun canParse(content: String): Boolean {

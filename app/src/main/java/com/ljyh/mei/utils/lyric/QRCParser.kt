@@ -22,10 +22,10 @@ object QRCParser : ILyricsParser {
      * @param translationLrc 可选的 LRC 格式的翻译文本。
      * @return 包含合并后歌词的 SyncedLyrics 对象。
      */
-    fun parse(qrcLyrics: String, translationLrc: String?): SyncedLyrics {
+    fun parse(qrcLyrics: String, translationLrc: String?, romanizationLrc: String? = null): SyncedLyrics {
         val karaokeLines = parseInternal(qrcLyrics.lineSequence())
         val mergedLines = TranslationHelper.merge(karaokeLines, translationLrc)
-        return SyncedLyrics(lines = mergedLines)
+        return SyncedLyrics(lines = mergedLines.withRomanization(romanizationLrc))
     }
 
     override fun canParse(content: String): Boolean {

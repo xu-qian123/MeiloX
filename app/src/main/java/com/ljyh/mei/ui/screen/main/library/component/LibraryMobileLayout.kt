@@ -30,6 +30,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -187,6 +188,10 @@ fun LibraryMobileLayout(
     onPlaylistClick: (String) -> Unit,
     onAlbumClick: (String) -> Unit,
     isCategoryPage: Boolean = false,
+    likedSongsRefreshing: Boolean = false,
+    playlistsRefreshing: Boolean = false,
+    onRefreshLikedSongs: () -> Unit = {},
+    onRefreshPlaylists: () -> Unit = {},
 ) {
     val navController = LocalNavController.current
     val context = LocalContext.current
@@ -290,6 +295,22 @@ fun LibraryMobileLayout(
             if (isNavigationTab) GlobalProfileAvatarButton()
         },
     ) { contentPadding ->
+        val refreshing = when (selectedPage) {
+            LibraryPage.Songs -> likedSongsRefreshing
+            LibraryPage.Playlists -> playlistsRefreshing
+            else -> false
+        }
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = {
+                when (selectedPage) {
+                    LibraryPage.Songs -> onRefreshLikedSongs()
+                    LibraryPage.Playlists -> onRefreshPlaylists()
+                    else -> Unit
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+        ) {
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -496,6 +517,7 @@ fun LibraryMobileLayout(
                     )
                 }
             }
+        }
         }
     }
 

@@ -6,8 +6,9 @@ import androidx.room.PrimaryKey
 /**
  * User-edited lyrics and per-song lyric preferences.
  *
- * Rows are keyed by [stableKey] (see `MediaMetadata.stableKey()`), which stays
- * consistent across app restarts and local/streaming entry points.
+ * Rows are keyed by [stableKey] (see `MediaMetadata.stableKey()`), which only uses the
+ * song identity and stays consistent across app restarts and entry points.
+ * 历史数据可能带 `歌曲身份|专辑` 旧主键，由 `CustomLyricRepository` 读取时迁移。
  */
 @Entity(tableName = "custom_lyric")
 data class CustomLyric(

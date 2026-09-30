@@ -41,12 +41,13 @@ import com.ljyh.mei.constants.TabletAnimationStyle
 import com.ljyh.mei.constants.TabletAnimationStyleKey
 import com.ljyh.mei.data.network.Resource
 import com.ljyh.mei.ui.component.player.OverlayState
-import com.ljyh.mei.ui.component.player.component.FluidProgressSlider
-import com.ljyh.mei.ui.component.player.component.PlayerControls
+import com.ljyh.mei.ui.component.player.component.AppleMusicProgressSlider
+import com.ljyh.mei.ui.component.player.component.AppleMusicSliderTrackStyle
 import com.ljyh.mei.ui.component.player.component.LyricScreen
 import com.ljyh.mei.ui.component.player.component.PlayerActionToolbar
-import com.ljyh.mei.ui.component.player.component.PlayerProgressSlider
+import com.ljyh.mei.ui.component.player.component.PlayerControls
 import com.ljyh.mei.ui.component.player.component.PlayerTableControls
+import com.ljyh.mei.ui.component.player.component.rememberLyricSeekHapticFeedback
 import com.ljyh.mei.ui.component.player.component.classic.component.Cover
 import com.ljyh.mei.ui.component.player.component.classic.component.PlayerHeader
 import com.ljyh.mei.ui.component.player.component.sheet.PlaylistContent
@@ -68,6 +69,11 @@ fun ClassicTabletLayout(
     val duration by remember { derivedStateOf { stateContainer.duration } }
     val lyricLine by remember { derivedStateOf { stateContainer.lyricLine } }
     val isLiked by stateContainer.isLiked
+
+    val seekHaptic = rememberLyricSeekHapticFeedback(
+        lyrics = lyricLine.lyricLine.lines,
+        lyricOffsetMs = stateContainer.lyricOffsetMs.value,
+    )
 
     var isShowingPlaylist by remember { mutableStateOf(false) }
 
@@ -126,30 +132,42 @@ fun ClassicTabletLayout(
             Spacer(Modifier.height(32.dp))
 
 
-            if (progressBarStyle == ProgressBarStyle.LINEAR) {
-                FluidProgressSlider(
-                    position = sliderPosition.toLong(),
-                    duration = duration,
-                    onPositionChange = { newPosition ->
-                        stateContainer.playerConnection.player.seekTo(newPosition)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .padding(horizontal = PlayerHorizontalPadding + 8.dp)
-                )
-            } else {
-                PlayerProgressSlider(
-                    position = sliderPosition.toLong(),
-                    duration = duration,
-                    isPlaying = isPlaying, // 波浪进度条需要这个参数
-                    onPositionChange = { newPosition ->
-                        stateContainer.playerConnection.player.seekTo(newPosition)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .padding(horizontal = PlayerHorizontalPadding + 8.dp)
-                )
-            }
+            AppleMusicProgressSlider(
+                position = sliderPosition.toLong(),
+                duration = duration,
+                isPlaying = isPlaying,
+                onPositionChange = { newPosition ->
+                    stateContainer.playerConnection.player.seekTo(newPosition)
+                },
+                modifier = Modifier
+                    .fillMaxWidth(0.7f)
+                    .padding(horizontal = PlayerHorizontalPadding + 8.dp),
+                trackStyle = if (progressBarStyle == ProgressBarStyle.LINEAR) {
+                    AppleMusicSliderTrackStyle.Solid
+                } else {
+                    AppleMusicSliderTrackStyle.Wave
+                },
+                isPlaybackWaiting = playbackState == androidx.media3.common.Player.STATE_BUFFERING,
+                playbackSpeed = stateContainer.playerConnection.player.playbackParameters.speed,
+                playbackSessionKey = stateContainer.currentSongId,
+                previewPositionMs = stateContainer.seekPreviewPositionMs,
+                onSeekPreviewStart = { positionMs ->
+                    seekHaptic.onSeekStart(positionMs)
+                    stateContainer.beginSeekPreview(positionMs)
+                },
+                onSeekPreviewMove = { positionMs ->
+                    seekHaptic.onSeekMove(positionMs)
+                    stateContainer.updateSeekPreview(positionMs)
+                },
+                onSeekPreviewEnd = { positionMs ->
+                    seekHaptic.onSeekEnd()
+                    if (positionMs != null) {
+                        stateContainer.endSeekPreview(positionMs)
+                    } else {
+                        stateContainer.cancelSeekPreview()
+                    }
+                },
+            )
 
 
 
@@ -189,6 +207,11 @@ fun ClassicTabletLayout(
                     lyricData = lyricLine,
                     playerConnection = stateContainer.playerConnection,
                     lyricOffsetMs = stateContainer.lyricOffsetMs.value,
+                    previewPositionMs = stateContainer.seekPreviewPositionMs,
+                    secondaryLineModeOverride = stateContainer.secondaryLineModeOverride,
+                    onSecondaryLineModeOverrideChange = {
+                        stateContainer.secondaryLineModeOverride = it
+                    },
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = PlayerHorizontalPadding),

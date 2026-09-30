@@ -639,4 +639,9 @@
     <string name="lyrics_match_confidence_high">High</string>
     <string name="lyrics_match_confidence_medium">Med</string>
     <string name="lyrics_match_confidence_low">Low</string>
+    <string name="lyrics_secondary_translation_short">Translation</string>
+    <string name="lyrics_secondary_phonetic_short">Phonetic</string>
+    <string name="lyrics_editor_load_failed">Could not load saved lyrics. Retry before editing.</string>
+    <string name="lyrics_editor_save_failed">Could not save lyrics. Your edits are still here; please retry.</string>
+    <string name="lyrics_editor_retry">Retry</string>
 </resources>

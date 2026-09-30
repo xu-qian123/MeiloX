@@ -6,6 +6,8 @@ import com.ljyh.mei.utils.lyric.match.providers.LyricMatchSourceProvider
 import com.ljyh.mei.utils.lyric.match.providers.NeteaseLyricProvider
 import com.ljyh.mei.utils.lyric.match.providers.QqLyricProvider
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,20 +30,22 @@ class LyricMatcher @Inject constructor(
         listOf(amllLyricProvider, kugouLyricProvider, neteaseLyricProvider, qqLyricProvider)
             .associateBy { it.source }
 
-    suspend fun matchLyrics(request: LyricMatchRequest): List<RankedLyricMatch> {
+    // Providers also decode/decompress lyrics and score candidates after network
+    // suspensions. Keep that work off the caller's (usually UI) thread.
+    suspend fun matchLyrics(request: LyricMatchRequest): List<RankedLyricMatch> = withContext(Dispatchers.Default) {
         val candidates = mutableListOf<LyricMatchCandidate>()
         for (source in manualLyricMatchSourceOrder) {
             if (source !in request.sources) continue
             candidates += searchSource(request, source)
         }
-        return rankLyricMatches(request, candidates).take(MAX_RESULTS)
+        rankLyricMatches(request, candidates).take(MAX_RESULTS)
     }
 
     suspend fun matchHighConfidenceForSource(
         request: LyricMatchRequest,
         source: LyricMatchSource,
-    ): List<RankedLyricMatch> {
-        return rankLyricMatches(request, searchSource(request, source))
+    ): List<RankedLyricMatch> = withContext(Dispatchers.Default) {
+        rankLyricMatches(request, searchSource(request, source))
     }
 
     private suspend fun searchSource(

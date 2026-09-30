@@ -82,6 +82,7 @@ import com.ljyh.mei.ui.component.player.OverlayState
 import com.ljyh.mei.ui.component.player.component.FluidBackground
 import com.ljyh.mei.ui.component.player.component.LyricScreen
 import com.ljyh.mei.ui.component.player.component.PlayerControlsSection
+import com.ljyh.mei.ui.component.player.component.rememberLyricSeekHapticFeedback
 import com.ljyh.mei.ui.component.player.overlay.PlayerOverlayHandler
 import com.ljyh.mei.ui.component.player.state.PlayerStateContainer
 import com.ljyh.mei.ui.component.sheet.BottomSheet
@@ -128,6 +129,11 @@ fun AppleMusicPlayer(
     val lyricLine by remember { derivedStateOf { stateContainer.lyricLine } }
     val isLiked by stateContainer.isLiked
     val sheetExpanded by remember(state) { derivedStateOf { state.isExpanded } }
+
+    val seekHaptic = rememberLyricSeekHapticFeedback(
+        lyrics = lyricLine.lyricLine.lines,
+        lyricOffsetMs = stateContainer.lyricOffsetMs.value,
+    )
 
     // --- Apple Music 特定的 LaunchedEffect ---
     BackHandler(enabled = sheetExpanded && showLyrics) {
@@ -286,6 +292,11 @@ fun AppleMusicPlayer(
                             lyricData = lyricLine,
                             playerConnection = stateContainer.playerConnection,
                             lyricOffsetMs = stateContainer.lyricOffsetMs.value,
+                            previewPositionMs = stateContainer.seekPreviewPositionMs,
+                            secondaryLineModeOverride = stateContainer.secondaryLineModeOverride,
+                            onSecondaryLineModeOverrideChange = {
+                                stateContainer.secondaryLineModeOverride = it
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
@@ -355,7 +366,6 @@ fun AppleMusicPlayer(
                                 subTitle = mediaMetadata!!.artists.joinToString { it.name },
                                 isLiked = isLiked,
                                 onLikeClick = { mediaMetadata?.let { stateContainer.playerViewModel.like(it.id.toString()) } },
-                                onMoreClick = { overlayHandler.showMoreAction() },
                                 onTitleClick = {
                                     mediaMetadata?.let {
                                         overlayHandler.showAlbumArtist(
@@ -400,7 +410,6 @@ fun AppleMusicPlayer(
                                         subTitle = it.artists.joinToString { artist -> artist.name },
                                         isLiked = isLiked,
                                         onLikeClick = { stateContainer.playerViewModel.like(it.id.toString()) },
-                                        onMoreClick = { overlayHandler.showMoreAction() },
                                         onTitleClick = {
                                             overlayHandler.showAlbumArtist(
                                                 album = it.album,
@@ -435,7 +444,24 @@ fun AppleMusicPlayer(
                                     overlayHandler.handleMoreAction(com.ljyh.mei.ui.model.MoreAction.DOWNLOAD)
                                 },
                                 onMoreClick = { overlayHandler.showMoreAction() },
-                                isCompact = isCompactHeight || isLandscape
+                                isCompact = isCompactHeight || isLandscape,
+                                previewPositionMs = stateContainer.seekPreviewPositionMs,
+                                onSeekPreviewStart = { positionMs ->
+                                    seekHaptic.onSeekStart(positionMs)
+                                    stateContainer.beginSeekPreview(positionMs)
+                                },
+                                onSeekPreviewMove = { positionMs ->
+                                    seekHaptic.onSeekMove(positionMs)
+                                    stateContainer.updateSeekPreview(positionMs)
+                                },
+                                onSeekPreviewEnd = { positionMs ->
+                                    seekHaptic.onSeekEnd()
+                                    if (positionMs != null) {
+                                        stateContainer.endSeekPreview(positionMs)
+                                    } else {
+                                        stateContainer.cancelSeekPreview()
+                                    }
+                                },
                             )
                         }
                     }

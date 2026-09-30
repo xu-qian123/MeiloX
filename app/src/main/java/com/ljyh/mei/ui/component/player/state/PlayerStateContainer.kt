@@ -25,11 +25,13 @@ import com.ljyh.mei.ui.component.player.PlayerViewModel
 import com.ljyh.mei.ui.local.LocalPlayerConnection
 import com.ljyh.mei.ui.model.LyricData
 import com.ljyh.mei.ui.model.LyricSource
+import com.ljyh.mei.ui.model.LyricsSecondaryLineMode
 import com.ljyh.mei.utils.lyric.createDefaultLyricData
 import com.ljyh.mei.utils.rememberPreference
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import timber.log.Timber
+import kotlin.math.abs
 
 @UnstableApi
 class PlayerStateContainer(
@@ -43,6 +45,20 @@ class PlayerStateContainer(
         internal set
 
     var isDragging by mutableStateOf(false)
+        internal set
+
+    /**
+     * 当前歌曲的副行显示模式（翻译 / 音译 / 关）；null = 自动。
+     * 换歌时在 [reset] 里清空，所以胶囊只影响当前这首，不会串到别的歌。
+     */
+    var secondaryLineModeOverride by mutableStateOf<LyricsSecondaryLineMode?>(null)
+        internal set
+
+    /**
+     * 拖动进度条时的预览位置：拖动中与松手后短暂保留，
+     * 等播放器进度追上（或取消）后清空，供歌词页跟随。
+     */
+    var seekPreviewPositionMs by mutableStateOf<Long?>(null)
         internal set
 
     var lyricLine by mutableStateOf(createDefaultLyricData("歌词加载中"))
@@ -97,6 +113,28 @@ class PlayerStateContainer(
         lyricLine = createDefaultLyricData("歌词加载中", source = LyricSource.Loading)
         sliderPosition = 0f
         duration = 0L
+        isDragging = false
+        seekPreviewPositionMs = null
+        secondaryLineModeOverride = null
+    }
+
+    fun beginSeekPreview(positionMs: Long) {
+        isDragging = true
+        seekPreviewPositionMs = positionMs
+    }
+
+    fun updateSeekPreview(positionMs: Long) {
+        seekPreviewPositionMs = positionMs
+    }
+
+    fun endSeekPreview(positionMs: Long) {
+        isDragging = false
+        seekPreviewPositionMs = positionMs
+    }
+
+    fun cancelSeekPreview() {
+        isDragging = false
+        seekPreviewPositionMs = null
     }
 }
 
@@ -176,6 +214,25 @@ fun rememberPlayerStateContainer(
         }
     }
 
+    // 拖动结束后的预览位置先保留，等播放器进度和 UI 进度都追上再交还，避免回跳。
+    LaunchedEffect(container.seekPreviewPositionMs, container.isDragging) {
+        val pending = container.seekPreviewPositionMs ?: return@LaunchedEffect
+        if (container.isDragging) return@LaunchedEffect
+        val player = container.playerConnection.player
+        var attempts = 0
+        while (isActive && attempts < LyricSeekPreviewMaxAttempts) {
+            val playerCaughtUp = shouldReleaseLyricSeekPreview(player.currentPosition, pending)
+            val uiCaughtUp = shouldReleaseLyricSeekPreview(container.sliderPosition.toLong(), pending)
+            if (playerCaughtUp && uiCaughtUp) {
+                container.seekPreviewPositionMs = null
+                return@LaunchedEffect
+            }
+            delay(50)
+            attempts++
+        }
+        container.seekPreviewPositionMs = null
+    }
+
     LaunchedEffect(container.mediaMetadata.value?.id) {
         container.mediaMetadata.value?.let { meta ->
             container.currentSongId = meta.id.toString()
@@ -203,3 +260,12 @@ fun rememberPlayerStateContainer(
 
     return container
 }
+
+internal const val LyricSeekPreviewSettleToleranceMs = 280L
+private const val LyricSeekPreviewMaxAttempts = 40
+
+internal fun shouldReleaseLyricSeekPreview(
+    playbackPositionMs: Long,
+    pendingSeekPreviewPositionMs: Long,
+    toleranceMs: Long = LyricSeekPreviewSettleToleranceMs,
+): Boolean = abs(playbackPositionMs - pendingSeekPreviewPositionMs) <= toleranceMs
