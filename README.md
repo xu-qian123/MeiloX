@@ -1,6 +1,6 @@
 <div align="center">
 
-# [MeiloX](https://github.com/NEORUAA/MeiloX)
+# [朝歌](https://github.com/NEORUAA/MeiloX)
 
 <img src="./screenshot/logo.png" width="120px" style="border-radius:12px"/>
 
@@ -17,7 +17,7 @@
 
 ## 项目简介
 
-MeiloX 是一个基于 [Mei](https://github.com/ljyh223/Mei) 改造的第三方网易云音乐客户端，使用 **Jetpack Compose** 构建，尝试把 iOS 27 的层次感、液态玻璃和沉浸式播放器体验带到 Android 上。
+朝歌 是一个基于 [Mei](https://github.com/ljyh223/Mei) 改造的第三方网易云音乐客户端，使用 **Jetpack Compose** 构建，尝试把 iOS 27 的层次感、液态玻璃和沉浸式播放器体验带到 Android 上。
 
 项目重点放在三个方向：
 
@@ -25,7 +25,7 @@ MeiloX 是一个基于 [Mei](https://github.com/ljyh223/Mei) 改造的第三方�
 - 用 Liquid Glass、动态背景和专辑封面让播放过程更有沉浸感；
 - 保留网易云音乐的搜索、歌单、歌词和个人资料等使用习惯。
 
-> MeiloX 是非官方的个人开源项目，不隶属于网易云音乐或 Apple；项目本身不提供音乐资源，音乐内容及相关版权归其权利人所有。
+> 朝歌 是非官方的个人开源项目，不隶属于网易云音乐或 Apple；项目本身不提供音乐资源，音乐内容及相关版权归其权利人所有。
 
 ## 功能概览
 
@@ -48,7 +48,7 @@ MeiloX 是一个基于 [Mei](https://github.com/ljyh223/Mei) 改造的第三方�
 
 ## 开源致谢
 
-MeiloX 的界面、歌词和底层能力受以下项目启发或直接使用其开源组件，感谢所有贡献者：
+朝歌 的界面、歌词和底层能力受以下项目启发或直接使用其开源组件，感谢所有贡献者：
 
 - [Mei](https://github.com/ljyh223/Mei)：上游 Android 项目与基础能力；
 - [MeloX](https://github.com/youshen2/MeloX)：iOS 版参考实现与产品方向；
@@ -60,7 +60,7 @@ MeiloX 的界面、歌词和底层能力受以下项目启发或直接使用其�
 
 ## 许可证与第三方声明
 
-MeiloX 主体代码以 [GNU General Public License v3](LICENSE) 发布。MeiloX 是 Mei 的衍生项目，相关上游代码和参考实现仍受其原始版权与许可证约束；第三方库、模型、脚本、字体和视觉素材不因 MeiloX 使用 GPLv3 就自动转为 GPLv3。
+朝歌 主体代码以 [GNU General Public License v3](LICENSE) 发布。朝歌 是 Mei 的衍生项目，相关上游代码和参考实现仍受其原始版权与许可证约束；第三方库、模型、脚本、字体和视觉素材不因朝歌使用 GPLv3 就自动转为 GPLv3。
 
 重点声明如下：
 
@@ -130,6 +130,6 @@ MeiloX 主体代码以 [GNU General Public License v3](LICENSE) 发布。MeiloX 
 
 <div align="center">
 
-Made with Jetpack Compose · MeiloX
+Made with Jetpack Compose · 朝歌
 
 </div>

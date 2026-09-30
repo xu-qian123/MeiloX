@@ -96,8 +96,8 @@
     <string name="pip_pause">暫停</string>
     <string name="pip_next">下一首</string>
     <string name="lyrics_waiting">等待歌詞</string>
-    <string name="app_name">MeiloX</string>
-    <string name="app_name_en">MeiloX</string>
+    <string name="app_name">朝歌</string>
+    <string name="app_name_en">朝歌</string>
     <string name="music_player">音樂播放器</string>
     <string name="error_no_internet">無網路連線</string>
     <string name="error_timeout">請求逾時</string>
@@ -249,7 +249,7 @@
     <string name="settings_playback">播放</string>
     <string name="settings_downloads">下載</string>
     <string name="settings_about">關於</string>
-    <string name="about_logo">Mei 圖示</string>
+    <string name="about_logo">朝歌圖示</string>
     <string name="about_version">版本 %1$s</string>
     <string name="about_development">開發</string>
     <string name="about_github">GitHub 儲存庫</string>

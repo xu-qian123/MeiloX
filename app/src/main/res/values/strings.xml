@@ -96,8 +96,8 @@
     <string name="pip_pause">Pause</string>
     <string name="pip_next">Next</string>
     <string name="lyrics_waiting">Waiting for lyrics</string>
-    <string name="app_name">MeiloX</string>
-    <string name="app_name_en">MeiloX</string>
+    <string name="app_name">朝歌</string>
+    <string name="app_name_en">朝歌</string>
     <string name="music_player">Music Player</string>
     <string name="error_no_internet">No network connection</string>
     <string name="error_timeout">Timeout</string>
@@ -250,7 +250,7 @@
     <string name="settings_playback">Playback</string>
     <string name="settings_downloads">Downloads</string>
     <string name="settings_about">About</string>
-    <string name="about_logo">Mei logo</string>
+    <string name="about_logo">朝歌图标</string>
     <string name="about_version">Version %1$s</string>
     <string name="about_development">Development</string>
     <string name="about_github">GitHub Repository</string>

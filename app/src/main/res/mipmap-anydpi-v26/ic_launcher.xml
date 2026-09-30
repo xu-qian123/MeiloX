@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  朝歌 launcher icon.
+
+  Layers are sized so the artwork's own plate lands exactly on the 72dp
+  visible region: the foreground is 108dp with the art inset so the plate
+  inside it measures 72dp. Scaling the plate to the full 108dp instead would
+  enlarge the mark by ~1.5x and crop the artwork's top-left highlight.
+
+  <monochrome> is a dedicated flat-white silhouette. Reusing the coloured
+  foreground here (as this file used to) collapses the gradient into a muddy
+  shape on Android 13+ themed icons.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@mipmap/ic_launcher_background"/>
-    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
-    <monochrome android:drawable="@mipmap/ic_launcher_foreground"/>
+    <background android:drawable="@drawable/chaoge_launcher_bg"/>
+    <foreground android:drawable="@drawable/chaoge_launcher_fg"/>
+    <monochrome android:drawable="@drawable/chaoge_launcher_mono"/>
 </adaptive-icon>
