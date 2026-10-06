@@ -42,5 +42,6 @@ private fun MediaMetadata.toCachedSong(): Song = Song(
     artist = artists.map { it.name },
     album = album.title,
     cover = coverUrl,
+    // MediaMetadata.duration is in milliseconds, matching the Song column unit.
     duration = duration,
 )

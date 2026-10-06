@@ -251,7 +251,9 @@ fun com.ljyh.mei.data.model.room.Song.toMediaMetadata(): MediaMetadata {
         artists = artist.map { name ->
             MediaMetadata.Artist(id = name.hashCode().toLong().let { if (it < 0) -it else it }, name = name)
         },
-        duration = duration * 1000,
+        // Song.duration is stored in milliseconds everywhere it is written, so it is
+        // already in MediaMetadata's unit (ms); do not convert.
+        duration = duration,
         album = MediaMetadata.Album(id = album.hashCode().toLong().let { if (it < 0) -it else it }, title = album),
         isLocal = sourceType == com.ljyh.mei.data.model.room.SourceType.LOCAL,
         originId = id,

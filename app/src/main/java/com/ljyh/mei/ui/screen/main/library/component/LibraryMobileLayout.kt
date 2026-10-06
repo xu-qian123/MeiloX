@@ -74,6 +74,7 @@ import com.ljyh.mei.playback.queue.ListQueue
 import com.ljyh.mei.ui.component.GlobalProfileAvatarButton
 import com.ljyh.mei.ui.component.player.OverlayState
 import com.ljyh.mei.ui.component.player.PlayerViewModel
+import com.ljyh.mei.ui.component.playlist.PlayingImageView
 import com.ljyh.mei.ui.glass.IosActionSheetContent
 import com.ljyh.mei.ui.glass.GlassSearchBar
 import com.ljyh.mei.ui.glass.GlassSegmentedControl
@@ -650,17 +651,17 @@ private fun LibraryMediaRow(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
-            image,
-            null,
-            Modifier.size(54.dp).clip(ContinuousRoundedRectangle(9.dp)),
-            contentScale = ContentScale.Crop,
+        PlayingImageView(
+            imageUrl = image,
+            isPlaying = isPlaying,
+            modifier = Modifier.size(54.dp).clip(ContinuousRoundedRectangle(9.dp)),
         )
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 title,
                 style = IosTypography.body,
+                fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
                 color = if (isPlaying) colors.accent else colors.content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -672,10 +673,6 @@ private fun LibraryMediaRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (isPlaying) {
-            SfIcon("speaker.wave.2.fill", null, size = 17.dp, tint = colors.accent)
-            Spacer(Modifier.width(8.dp))
         }
         trailing?.let { trailingContent ->
             CompositionLocalProvider(LocalGroupedListIconColor provides colors.content) {

@@ -51,6 +51,7 @@ class PlaybackQueueManager(
     private var serverShuffleRequested = false
     private var cloudShuffleEnabled: Boolean? = null
     private var queueSelectionJob: Job? = null
+    private var queueHydrationJob: Job? = null
 
     private val _isShuffleModeEnabled = MutableStateFlow(false)
     var isFmMode = false
@@ -446,6 +447,9 @@ class PlaybackQueueManager(
                 // 因为当前歌曲已经是 RealItem 了，这个方法会自动跳过当前歌曲，去加载下一首
                 checkAndLoadMetadata()
 
+                // 7. 后台补全整个队列里仍是占位符的条目，避免队列列表大面积显示 0:00 / 加载中。
+                startQueueHydration(generation)
+
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -617,6 +621,59 @@ class PlaybackQueueManager(
     }
 
     /**
+     * 后台补全队列里仍是占位符的条目。
+     *
+     * 歌单详情接口只返回首批（约 10 首）完整歌曲，其余条目在队列里是占位符，
+     * 不补全的话队列列表会大面积显示「加载中… · 0:00」。这里按批请求歌曲详情并
+     * 就地替换占位符；[StableDeckPlayer.handleReplaceMediaItems] 会在 mediaId 相同时
+     * 保留 queueEntryId，所以不会打乱顺序或随机顺序。
+     */
+    private fun startQueueHydration(generation: Long) {
+        queueHydrationJob?.cancel()
+        queueHydrationJob = scope.launch(Dispatchers.Main) {
+            try {
+                if (generation != queueBuildGeneration) return@launch
+                val player = this@PlaybackQueueManager.player
+                if (player.mediaItemCount == 0) return@launch
+
+                // 收集所有仍是占位符的条目 ID（去重）。
+                val idsToHydrate = (0 until player.mediaItemCount)
+                    .asSequence()
+                    .map { player.getMediaItemAt(it) }
+                    .filter { needsMetadataHydration(it) }
+                    .map { it.mediaId }
+                    .distinct()
+                    .filter { it.isNotBlank() }
+                    .toList()
+                if (idsToHydrate.isEmpty()) return@launch
+
+                for (chunk in idsToHydrate.chunked(SONG_DETAIL_BATCH_SIZE)) {
+                    currentCoroutineContext().ensureActive()
+                    if (generation != queueBuildGeneration) return@launch
+                    val loaded = loadSongDetails(chunk)
+                    if (loaded.isEmpty()) continue
+
+                    if (generation != queueBuildGeneration) return@launch
+                    if (player.mediaItemCount == 0) return@launch
+                    val byId = loaded.associateBy { it.mediaId }
+                    // 占位符可能已被前一步（当前/邻近歌曲懒加载）替换，逐项二查后再替换。
+                    for (index in 0 until player.mediaItemCount) {
+                        val current = player.getMediaItemAt(index)
+                        if (!isPlaceholderMediaItem(current)) continue
+                        byId[current.mediaId]?.let { player.replaceMediaItem(index, it) }
+                    }
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Log.w(TAG, "Queue hydration failed", error)
+            } finally {
+                if (generation == queueBuildGeneration) queueHydrationJob = null
+            }
+        }
+    }
+
+    /**
      * 添加到队列末尾
      */
     fun addToQueue(items: List<MediaItem>) {
@@ -694,6 +751,8 @@ class PlaybackQueueManager(
     private fun cancelActiveQueueBuild() {
         cancelServerShuffle()
         queueSelectionJob?.cancel()
+        queueHydrationJob?.cancel()
+        queueHydrationJob = null
         playlistSource = null
         activeQueueBuildJob?.cancel()
         activeQueueBuildJob = null
@@ -708,6 +767,11 @@ class PlaybackQueueManager(
         data class Error(val message: String) : QueueState()
         object Completed : QueueState()
         object Empty : QueueState()
+    }
+
+    private companion object {
+        /** 歌曲详情接口单次请求的 ID 上限。 */
+        const val SONG_DETAIL_BATCH_SIZE = 200
     }
 }
 

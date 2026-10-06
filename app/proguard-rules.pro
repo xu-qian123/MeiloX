@@ -172,6 +172,14 @@
 # ONNX Runtime's JNI and reflective Java API are required by minimized builds.
 -keep class ai.onnxruntime.** { *; }
 
+# The bundled FFmpeg extension renderer is loaded reflectively by DefaultRenderersFactory;
+# keep the classes and the native entry points used by the JNI layer.
+-keep class androidx.media3.decoder.ffmpeg.FfmpegAudioRenderer { *; }
+-keep class androidx.media3.decoder.ffmpeg.FfmpegLibrary { *; }
+-keep class androidx.media3.decoder.ffmpeg.FfmpegAudioDecoder { *; }
+-keepclasseswithmembernames class androidx.media3.decoder.ffmpeg.** {
+    native <methods>;
+}
 # zstd-jni resolves its native bindings by Java class and method name.
 -keep class com.github.luben.zstd.** { *; }
 

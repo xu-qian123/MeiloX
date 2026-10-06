@@ -18,6 +18,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Player.EVENT_POSITION_DISCONTINUITY
@@ -33,6 +34,7 @@ import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR
 import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.decoder.ffmpeg.FfmpegLibrary
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -41,11 +43,8 @@ import androidx.media3.exoplayer.analytics.PlaybackStatsListener
 import androidx.media3.exoplayer.audio.AudioTrackAudioOutputProvider
 import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.audio.SilenceSkippingAudioProcessor
-import androidx.media3.exoplayer.drm.DrmSessionManagerProvider
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.exoplayer.source.MediaSource
-import androidx.media3.exoplayer.source.preload.DefaultPreloadManager
-import androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaController
 import androidx.media3.session.MediaLibraryService
@@ -141,8 +140,6 @@ class MusicService : MediaLibraryService(),
     private var isRestoringPlayback = true
     private lateinit var connectivityManager: ConnectivityManager
     private lateinit var baseMediaSourceFactory: DefaultMediaSourceFactory
-    private lateinit var preloadManager: DefaultPreloadManager
-    private val preloadStrategy = MusicPreloadStrategy()
     val currentMediaMetadata = MutableStateFlow<MediaMetadata?>(null)
 
     @Inject
@@ -187,33 +184,6 @@ class MusicService : MediaLibraryService(),
         equalizerConfigurationState = EqualizerConfigurationState(this, scope)
         baseMediaSourceFactory = DefaultMediaSourceFactory(createDataSourceFactory())
             .setLoadErrorHandlingPolicy(MusicLoadErrorHandlingPolicy()) // 应用自定义错误策略
-        val preloadManagerBuilder = DefaultPreloadManager.Builder(
-            this,
-            preloadStrategy
-        )
-            .setMediaSourceFactory(baseMediaSourceFactory) // 告诉管理器用什么去下载
-
-        val playerMediaSourceFactory = object : MediaSource.Factory {
-            // 必须实现的方法，委托给 baseMediaSourceFactory
-            override fun setDrmSessionManagerProvider(provider: DrmSessionManagerProvider) = apply {
-                baseMediaSourceFactory.setDrmSessionManagerProvider(provider)
-            }
-
-            override fun setLoadErrorHandlingPolicy(policy: LoadErrorHandlingPolicy) = apply {
-                baseMediaSourceFactory.setLoadErrorHandlingPolicy(policy)
-            }
-
-            override fun getSupportedTypes(): IntArray = baseMediaSourceFactory.supportedTypes
-
-            // 创建 MediaSource
-            override fun createMediaSource(mediaItem: MediaItem): MediaSource {
-                // 优先问 PreloadManager 要预加载好的 Source
-                return preloadManager.getMediaSource(mediaItem)
-                // 如果没预加载过，就创建一个新的
-                    ?: baseMediaSourceFactory.createMediaSource(mediaItem)
-            }
-        }
-
 
         setMediaNotificationProvider(
             DefaultMediaNotificationProvider(
@@ -230,7 +200,7 @@ class MusicService : MediaLibraryService(),
             .build()
         val firstDeck = ExoPlayer.Builder(this)
             //媒体源工厂
-            .setMediaSourceFactory(playerMediaSourceFactory)
+            .setMediaSourceFactory(baseMediaSourceFactory)
             //渲染器工厂
             .setRenderersFactory(createRenderersFactory())
             //处理音频焦点变化和音频播放行为
@@ -244,12 +214,6 @@ class MusicService : MediaLibraryService(),
             .setSeekBackIncrementMs(5000)
             .setSeekForwardIncrementMs(5000)
             .build()
-            .also { builtPlayer ->
-                // PreloadMediaSource must be prepared on the same looper that consumes it.
-                preloadManager = preloadManagerBuilder
-                    .setPreloadLooper(builtPlayer.playbackLooper)
-                    .build()
-            }
         val secondDeck = ExoPlayer.Builder(this)
             .setMediaSourceFactory(
                 DefaultMediaSourceFactory(createDataSourceFactory())
@@ -273,11 +237,9 @@ class MusicService : MediaLibraryService(),
                     playbackPersistence.invalidateQueue()
                     schedulePlaybackSnapshot()
                 }
-                updatePreload()
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                updatePreload()
                 automaticCacheJob?.cancel()
                 if (mediaItem != null) {
                     automaticCacheJob = scope.launch {
@@ -476,28 +438,10 @@ class MusicService : MediaLibraryService(),
         }.onFailure { Timber.tag("MusicService").w(it, "Unable to save final playback snapshot") }
     }
 
-    private fun updatePreload() {
-        if (player.currentTimeline.isEmpty) return
-
-        val currentIndex = player.currentMediaItemIndex
-        preloadStrategy.currentPlayingIndex = currentIndex
-        if (currentIndex + 1 < player.mediaItemCount) {
-            val nextItem = player.getMediaItemAt(currentIndex + 1)
-            preloadManager.add(nextItem, currentIndex + 1)
-        }
-
-        // 3. 触发检查
-        preloadManager.invalidate()
-    }
-
     /** Clears sources tied to the previous quality while keeping the player playlist intact. */
     fun resetPlaybackSourcesForQualityChange() {
         if (::autoMixController.isInitialized) {
             autoMixController.resetForQualityChange()
-        }
-        if (::preloadManager.isInitialized) {
-            // BasePreloadManager requires all lifecycle calls on its construction thread.
-            preloadManager.reset()
         }
     }
 
@@ -744,7 +688,6 @@ class MusicService : MediaLibraryService(),
         sleepTimer.clear()
         player.removeListener(sleepTimer)
         queueManager.release()
-        preloadManager.release()
         autoMixController.release()
         equalizerConfigurationState.release()
         listenTogetherStore.detachPlayer(player)
@@ -836,6 +779,23 @@ class MusicService : MediaLibraryService(),
 
     private fun createRenderersFactory() =
         object : DefaultRenderersFactory(this) {
+            init {
+                // Prefer the bundled FFmpeg decoder for FLAC: some platform decoders cap the
+                // input buffer far below the size of hi-res FLAC frames, which makes ExoPlayer
+                // skip every oversized sample and buffer forever.
+                val ffmpegCanDecodeFlac = runCatching {
+                    FfmpegLibrary.isAvailable() && FfmpegLibrary.supportsFormat(MimeTypes.AUDIO_FLAC)
+                }.getOrDefault(false)
+                if (ffmpegCanDecodeFlac) {
+                    setMediaCodecSelector(
+                        FlacPreferFfmpegMediaCodecSelector(
+                            delegate = MediaCodecSelector.DEFAULT,
+                            preferFfmpegForFlac = true,
+                        ),
+                    )
+                }
+            }
+
             override fun buildAudioSink(
                 context: Context,
                 enableFloatOutput: Boolean,
@@ -857,6 +817,10 @@ class MusicService : MediaLibraryService(),
                     )
                 ).build()
         }
+            // Allow Media3 to try lower-priority decoders when the preferred one fails, and
+            // register the FFmpeg extension renderer used for FLAC.
+            .setEnableDecoderFallback(true)
+            .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
     inner class MusicBinder : Binder() {
         val service: MusicService
@@ -983,7 +947,6 @@ class MusicService : MediaLibraryService(),
             // 触发 FM 模式检查 (见下文)
             checkFmModeLoadMore()
         }
-        updatePreload()
     }
 
     private fun checkFmModeLoadMore() {

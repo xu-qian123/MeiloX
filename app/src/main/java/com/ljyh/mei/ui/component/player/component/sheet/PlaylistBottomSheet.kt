@@ -42,7 +42,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -53,7 +52,6 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
-import coil3.compose.AsyncImage
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.kyant.shapes.Capsule
 import com.ljyh.mei.R
@@ -61,6 +59,7 @@ import com.ljyh.mei.data.model.MediaMetadata
 import com.ljyh.mei.data.model.metadata
 import com.ljyh.mei.playback.playbackOrderIndices
 import com.ljyh.mei.playback.queueEntryId
+import com.ljyh.mei.ui.component.playlist.PlayingImageView
 import com.ljyh.mei.ui.glass.IosModalSheetShape
 import com.ljyh.mei.ui.glass.IosSheetSurface
 import com.ljyh.mei.ui.glass.IosSheetTopToolbar
@@ -331,17 +330,16 @@ fun PlaylistItem(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AsyncImage(
-            model = metadata.coverUrl.smallImage(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
+        PlayingImageView(
+            imageUrl = metadata.coverUrl.smallImage(),
+            isPlaying = isCurrentPlaying,
             modifier = Modifier.size(44.dp).clip(ContinuousRoundedRectangle(9.dp)),
         )
         Column(Modifier.weight(1f)) {
             Text(
                 metadata.title,
                 style = IosTypography.body,
-                fontWeight = if (isCurrentPlaying) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = if (isCurrentPlaying) FontWeight.Bold else FontWeight.Normal,
                 color = if (isCurrentPlaying) colors.accent else colors.content,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -353,9 +351,6 @@ fun PlaylistItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (isCurrentPlaying) {
-            SfIcon("speaker.wave.2.fill", null, size = 17.dp, tint = colors.accent)
         }
         Box(
             Modifier.size(36.dp).clip(ContinuousRoundedRectangle(50)).clickable(onClick = onRemoveClick),

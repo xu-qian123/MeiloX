@@ -80,10 +80,12 @@ object CacheManager {
         val defaultDataSourceFactory = DefaultDataSource.Factory(context, okHttpDataSourceFactory)
 
         // 3. 将包装后的工厂设为 CacheDataSource 的上游
+        // 注意：不要使用 FLAG_BLOCK_ON_CACHE。预加载/上次中断可能留下未写完的缓存片段，
+        // 阻塞式读取会在等待该片段时把加载线程永久堵死，导致切歌后一直缓冲。
         return CacheDataSource.Factory()
             .setCache(simpleCache)
             .setUpstreamDataSourceFactory(defaultDataSourceFactory) // 改为 defaultDataSourceFactory
-            .setFlags(CacheDataSource.FLAG_BLOCK_ON_CACHE or FLAG_IGNORE_CACHE_ON_ERROR)
+            .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
     }
     @OptIn(UnstableApi::class)
     fun isContentFullyCached(cache: Cache, key: String): Boolean {

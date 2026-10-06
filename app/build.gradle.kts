@@ -1,5 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -16,6 +18,30 @@ plugins {
 android {
     namespace = "com.ljyh.mei"
     compileSdk = 37
+
+    val signingProperties = Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+    val debugKeystore = File(System.getProperty("user.home"), ".android/debug.keystore")
+    val configuredKeystore = signingProperties.getProperty("KEYSTORE_FILE")
+        ?.let { rootProject.file(it) }
+
+    signingConfigs {
+        create("release") {
+            // Prefer an explicitly configured release keystore; otherwise fall back to the
+            // Android debug keystore so `assembleRelease` still produces an installable APK.
+            val keystore = configuredKeystore?.takeIf { it.exists() }
+                ?: debugKeystore.takeIf { it.exists() }
+            if (keystore != null) {
+                storeFile = keystore
+                storePassword = signingProperties.getProperty("KEYSTORE_PASSWORD") ?: "android"
+                keyAlias = signingProperties.getProperty("KEY_ALIAS") ?: "androiddebugkey"
+                keyPassword = signingProperties.getProperty("KEY_PASSWORD") ?: "android"
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.neoruaa.meilox"
         minSdk = 33
@@ -35,6 +61,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -99,6 +126,9 @@ dependencies {
     implementation(libs.media3)
     implementation(libs.media3.session)
     implementation(libs.media3.okhttp)
+    // Bundled FFmpeg decoder extension. Prefer it for FLAC so playback does not depend on
+    // platform decoders that may cap the input buffer (some devices reject large hi-res frames).
+    implementation(files("libs/lib-decoder-ffmpeg-media3-1.8.0-ffmpeg-6.0-api28-common-release.aar"))
     implementation(libs.annotations)
     implementation(libs.androidx.core.animation)
     implementation(libs.androidx.compose.material3.window.size.class1)

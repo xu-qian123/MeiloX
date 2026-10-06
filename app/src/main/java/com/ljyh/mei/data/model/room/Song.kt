@@ -10,6 +10,7 @@ data class Song(
     val artist: List<String>,
     val album: String,
     val cover: String,
+    /** 时长，单位毫秒（与 MediaMetadata.duration 一致）。 */
     val duration: Long,
     val path: String? = null,
     val sourceType: SourceType = SourceType.STREAM,
