@@ -1,4 +1,12 @@
 <resources>
+    <string name="lyrics_mode_translation">Lyric translation</string>
+    <string name="lyrics_mode_phonetic">Lyric pronunciation</string>
+    <string name="lyrics_secondary_control">Translation and pronunciation</string>
+    <string name="lyrics_secondary_off">Off</string>
+    <string name="lyrics_source_control">Lyrics source: %1$s. Tap to choose lyrics.</string>
+    <string name="lyrics_source_custom">Custom</string>
+    <string name="lyrics_source_loading">Loading</string>
+    <string name="lyrics_source_unknown">Lyrics</string>
     <string name="loudness_normalization">Loudness normalization</string>
     <string name="loudness_normalization_description">Gradually reduces volume differences between songs. Mono/stereo only. AutoMix reserves extra peak headroom.</string>
     <string name="loudness_target">Target loudness: %1$d LUFS</string>

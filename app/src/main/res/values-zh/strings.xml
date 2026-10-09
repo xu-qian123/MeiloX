@@ -1,4 +1,12 @@
 <resources>
+    <string name="lyrics_mode_translation">歌词翻译</string>
+    <string name="lyrics_mode_phonetic">歌词音译</string>
+    <string name="lyrics_secondary_control">翻译与音译</string>
+    <string name="lyrics_secondary_off">关闭</string>
+    <string name="lyrics_source_control">歌词来源：%1$s，点按选择歌词</string>
+    <string name="lyrics_source_custom">自定义</string>
+    <string name="lyrics_source_loading">加载中</string>
+    <string name="lyrics_source_unknown">歌词</string>
     <string name="loudness_normalization">响度均衡</string>
     <string name="loudness_normalization_description">逐渐减小歌曲间的音量差异，支持单声道和立体声。AutoMix 开启时会额外预留峰值余量。</string>
     <string name="loudness_target">目标响度：%1$d LUFS</string>

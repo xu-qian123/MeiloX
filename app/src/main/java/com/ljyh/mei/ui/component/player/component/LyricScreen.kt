@@ -11,16 +11,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.Icon
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,7 +55,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import com.ljyh.mei.ui.glass.SfIcon
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextMotion
@@ -91,6 +95,7 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -224,6 +229,20 @@ fun LyricScreen(
                     val lines = lyricData.lyricLine.lines
                     // Restore from playback after measuring, not from a saved scroll offset.
                     val listState = remember(player) { LazyListState() }
+                    val isDragged by listState.interactionSource.collectIsDraggedAsState()
+                    var holdLyricsClear by remember(listState) { mutableStateOf(false) }
+                    LaunchedEffect(listState) {
+                        snapshotFlow { isDragged to listState.isScrollInProgress }
+                            .collectLatest { (dragging, scrolling) ->
+                                // Only a user drag starts the hold; include its fling before
+                                // counting down. A new drag cancels the previous countdown.
+                                if (dragging) holdLyricsClear = true
+                                if (holdLyricsClear && !dragging && !scrolling) {
+                                    delay(2_000)
+                                    holdLyricsClear = false
+                                }
+                            }
+                    }
                     // Rows revealed by a within-screen jump need an existing placement
                     // to animate from. Keep a full window laid out beyond each edge.
                     val keepAliveZone = LocalConfiguration.current.screenHeightDp.dp
@@ -297,6 +316,7 @@ fun LyricScreen(
                     }
                     key(placementGeneration, keepAliveZonePx) {
                         KaraokeLyricsView(
+                            useBlurEffect = !holdLyricsClear,
                             listState = listState,
                             lyrics = displayLyricLine,
                             currentPosition = { animatedPosition.toInt() },
@@ -366,14 +386,7 @@ fun LyricScreen(
                         mode = secondaryLineMode,
                         hasTranslation = hasTranslation,
                         hasPhonetic = hasPhonetic,
-                        onCycle = {
-                            val next = nextLyricsSecondaryLineMode(
-                                current = secondaryLineMode,
-                                hasTranslation = hasTranslation,
-                                hasPhonetic = hasPhonetic,
-                            )
-                            onSecondaryLineModeOverrideChange(next)
-                        },
+                        onSelect = onSecondaryLineModeOverrideChange,
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(bottom = 8.dp)
@@ -385,49 +398,41 @@ fun LyricScreen(
     }
 }
 
-/** 副行模式胶囊：点击在「翻译 → 音译 → 关闭」之间循环。 */
+/** One icon cycles only through the secondary lines available for this song. */
 @Composable
 private fun LyricSecondaryLinePill(
     mode: LyricsSecondaryLineMode,
     hasTranslation: Boolean,
     hasPhonetic: Boolean,
-    onCycle: () -> Unit,
+    onSelect: (LyricsSecondaryLineMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = ContinuousRoundedRectangle(4.dp)
-    Row(
-        modifier = modifier
-            .clip(shape)
-            .background(Color.White.copy(alpha = 0.2f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.1f), shape)
-            .clickable { onCycle() }
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    val active = mode != LyricsSecondaryLineMode.NONE
+    val description = stringResource(R.string.lyrics_secondary_control)
+    val modeDescription = stringResource(when (mode) {
+        LyricsSecondaryLineMode.TRANSLATION -> R.string.lyrics_mode_translation
+        LyricsSecondaryLineMode.PHONETIC -> R.string.lyrics_mode_phonetic
+        LyricsSecondaryLineMode.NONE -> R.string.lyrics_secondary_off
+    })
+    val shape = ContinuousRoundedRectangle(24.dp)
+    val tint = if (active) Color.Black.copy(alpha = .85f) else Color.White.copy(alpha = .65f)
+    Box(
+        modifier.size(48.dp).clip(shape)
+            .background(if (active) Color.White else Color.White.copy(alpha = .10f))
+            .border(.5.dp, Color.White.copy(alpha = .14f), shape)
+            .semantics(mergeDescendants = true) {
+                contentDescription = description
+                stateDescription = modeDescription
+            }
+            .clickable(role = Role.Button) {
+                onSelect(nextLyricsSecondaryLineMode(mode, hasTranslation, hasPhonetic))
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        if (hasTranslation) {
-            Text(
-                text = stringResource(R.string.lyrics_secondary_translation_short),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (mode == LyricsSecondaryLineMode.TRANSLATION) {
-                    Color.White
-                } else {
-                    Color.White.copy(alpha = 0.45f)
-                },
-            )
-        }
-        if (hasPhonetic) {
-            Text(
-                text = stringResource(R.string.lyrics_secondary_phonetic_short),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (mode == LyricsSecondaryLineMode.PHONETIC) {
-                    Color.White
-                } else {
-                    Color.White.copy(alpha = 0.45f)
-                },
-            )
+        if (mode == LyricsSecondaryLineMode.PHONETIC) {
+            Text("ā", color = tint, fontSize = 27.sp, fontWeight = FontWeight.Medium)
+        } else {
+            SfIcon("translate", contentDescription = null, size = 23.dp, tint = tint)
         }
     }
 }
@@ -485,30 +490,45 @@ private fun LyricSourceBadge(
     modifier: Modifier = Modifier,
     onClick: (LyricSource) -> Unit,
 ) {
+    val sourceName = stringResource(when (source) {
+        LyricSource.NetEaseCloudMusic -> R.string.lyrics_match_source_netease
+        LyricSource.QQMusic -> R.string.lyrics_match_source_qq
+        LyricSource.AM -> R.string.lyrics_match_source_amll
+        LyricSource.Kugou -> R.string.lyrics_match_source_kugou
+        LyricSource.Custom -> R.string.lyrics_source_custom
+        LyricSource.Loading -> R.string.lyrics_source_loading
+        LyricSource.Empty -> R.string.lyrics_source_unknown
+    })
+    val description = stringResource(R.string.lyrics_source_control, sourceName)
+    val shape = ContinuousRoundedRectangle(24.dp)
     Box(
-        modifier = modifier
-            .clip(ContinuousRoundedRectangle(4.dp))
-            .background(Color.White.copy(alpha = 0.2f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.1f), ContinuousRoundedRectangle(4.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp)
-            .clickable { onClick(source) }
+        modifier.size(48.dp).clip(shape)
+            .background(Color.White.copy(alpha = .12f))
+            .border(.5.dp, Color.White.copy(alpha = .14f), shape)
+            .semantics { contentDescription = description }
+            .clickable(role = Role.Button) { onClick(source) },
+        contentAlignment = Alignment.Center,
     ) {
-
-        Icon(
-            painter = painterResource(
-                when (source) {
-                    LyricSource.Empty, LyricSource.Loading -> R.drawable.empty
+        when (source) {
+            LyricSource.NetEaseCloudMusic, LyricSource.QQMusic, LyricSource.AM -> Icon(
+                painter = painterResource(when (source) {
                     LyricSource.NetEaseCloudMusic -> R.drawable.netease
                     LyricSource.QQMusic -> R.drawable.qq
-                    LyricSource.AM -> R.drawable.am
-                    // TODO(M4): dedicated custom / kugou badges.
-                    LyricSource.Custom -> R.drawable.empty
-                    LyricSource.Kugou -> R.drawable.empty
-                }
-            ),
-            modifier = Modifier.size(16.dp),
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.6f)
-        )
+                    else -> R.drawable.am
+                }),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                tint = Color.White.copy(alpha = .9f),
+            )
+            LyricSource.Kugou -> Text("K", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            else -> SfIcon(
+                when (source) {
+                    LyricSource.Custom -> "square.and.pencil"
+                    LyricSource.Loading -> "ellipsis"
+                    else -> "quote.bubble"
+                },
+                contentDescription = null, size = 22.dp, tint = Color.White.copy(alpha = .9f),
+            )
+        }
     }
 }

@@ -104,7 +104,9 @@ out vec4 fragColor;
 
 void main() {
     vec4 color = texture(u_texture, v_texCoord);
-    fragColor = vec4(color.rgb, color.a * u_alpha);
+    // Dim the shared playback/lyrics background by 30%, after mesh color processing.
+    // Keep alpha unchanged so album crossfades and sheet transitions behave as before.
+    fragColor = vec4(color.rgb * 0.70, color.a * u_alpha);
 }
 """
 }
