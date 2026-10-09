@@ -1,4 +1,7 @@
 <resources>
+    <string name="loudness_normalization">Loudness normalization</string>
+    <string name="loudness_normalization_description">Gradually reduces volume differences between songs. Mono/stereo only. AutoMix reserves extra peak headroom.</string>
+    <string name="loudness_target">Target loudness: %1$d LUFS</string>
     <string name="artist_follow">Follow</string>
     <string name="artist_following">Following</string>
     <string name="artist_unavailable_title">Artist unavailable</string>

@@ -1,4 +1,7 @@
 <resources>
+    <string name="loudness_normalization">響度均衡</string>
+    <string name="loudness_normalization_description">逐漸減小歌曲間的音量差異，支援單聲道和立體聲。AutoMix 開啟時會額外預留峰值餘量。</string>
+    <string name="loudness_target">目標響度：%1$d LUFS</string>
     <string name="artist_follow">關注</string>
     <string name="artist_following">已關注</string>
     <string name="artist_unavailable_title">無相關藝人</string>

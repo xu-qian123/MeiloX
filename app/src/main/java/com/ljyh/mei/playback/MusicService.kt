@@ -122,6 +122,7 @@ class MusicService : MediaLibraryService(),
     lateinit var lyricManager: com.ljyh.mei.utils.lyric.LyricManager
     private lateinit var autoMixController: AutoMixController
     private lateinit var equalizerConfigurationState: EqualizerConfigurationState
+    private lateinit var loudnessConfigurationState: LoudnessConfigurationState
     val context = this
     private lateinit var mediaSession: MediaLibrarySession
 
@@ -182,6 +183,7 @@ class MusicService : MediaLibraryService(),
         super.onCreate()
         playbackHistoryReporter = PlaybackHistoryReporter(meloXRepository, neteaseClientLogClient)
         equalizerConfigurationState = EqualizerConfigurationState(this, scope)
+        loudnessConfigurationState = LoudnessConfigurationState(this, scope)
         baseMediaSourceFactory = DefaultMediaSourceFactory(createDataSourceFactory())
             .setLoadErrorHandlingPolicy(MusicLoadErrorHandlingPolicy()) // 应用自定义错误策略
 
@@ -690,6 +692,7 @@ class MusicService : MediaLibraryService(),
         queueManager.release()
         autoMixController.release()
         equalizerConfigurationState.release()
+        loudnessConfigurationState.release()
         listenTogetherStore.detachPlayer(player)
 
         closeAudioEffectSession()
@@ -800,22 +803,35 @@ class MusicService : MediaLibraryService(),
                 context: Context,
                 enableFloatOutput: Boolean,
                 enableAudioTrackPlaybackParams: Boolean,
-            ) = DefaultAudioSink.Builder(this@MusicService)
+            ): androidx.media3.exoplayer.audio.AudioSink {
+                val processor = TenBandEqualizerProcessor(
+                    equalizerConfigurationState::snapshot,
+                    loudnessConfigurationState::snapshot,
+                )
+                val sink = DefaultAudioSink.Builder(this@MusicService)
                 .setAudioOutputProvider(
                     beatMeter.wrap(AudioTrackAudioOutputProvider.Builder(this@MusicService).build()),
                 )
-                .setEnableFloatOutput(enableFloatOutput)
+                // The float-output fast path can bypass custom processors for high-res input.
+                .setEnableFloatOutput(false)
                 // AutoMix continuously changes tempo. Sonic's parameter changes drain and
                 // restart the PCM processor chain, producing periodic gaps during overlap.
                 // Apply tempo at AudioTrack instead, keeping the EQ/PCM pipeline continuous.
                 .setEnableAudioOutputPlaybackParameters(true)
                 .setAudioProcessorChain(
                     DefaultAudioSink.DefaultAudioProcessorChain(
-                        arrayOf(TenBandEqualizerProcessor(equalizerConfigurationState)),
+                        arrayOf(processor),
                         SilenceSkippingAudioProcessor(2_000_000, 0.01f, 2_000_000, 0, 256),
                         SonicAudioProcessor()
                     )
                 ).build()
+                return object : androidx.media3.exoplayer.audio.ForwardingAudioSink(sink) {
+                    override fun handleDiscontinuity() {
+                        super.handleDiscontinuity()
+                        processor.resetLoudness()
+                    }
+                }
+            }
         }
             // Allow Media3 to try lower-priority decoders when the preferred one fails, and
             // register the FFmpeg extension renderer used for FLAC.

@@ -30,6 +30,8 @@ import com.ljyh.mei.constants.AutoMixTailCutBarsKey
 import com.ljyh.mei.constants.AutoMixTempoMatchingKey
 import com.ljyh.mei.constants.AutoMixTransitionBarsKey
 import com.ljyh.mei.constants.LoopPlaybackKey
+import com.ljyh.mei.constants.LoudnessNormalizationEnabledKey
+import com.ljyh.mei.constants.LoudnessNormalizationTargetKey
 import com.ljyh.mei.constants.CloudShuffleEnabledKey
 import com.ljyh.mei.constants.MusicQuality
 import com.ljyh.mei.constants.MusicQualityKey
@@ -60,6 +62,8 @@ fun PlaySetting(
     val navController = LocalNavController.current
     val (musicQuality, onMusicQualityChange) = rememberEnumPreference(MusicQualityKey, MusicQuality.EXHIGH)
     val (loopPlayback, onLoopPlaybackChange) = rememberPreference(LoopPlaybackKey, true)
+    val (loudnessEnabled, onLoudnessEnabledChange) = rememberPreference(LoudnessNormalizationEnabledKey, false)
+    val (loudnessTarget, onLoudnessTargetChange) = rememberPreference(LoudnessNormalizationTargetKey, -16f)
     val (cloudShuffle, onCloudShuffleChange) = rememberPreference(CloudShuffleEnabledKey, true)
     val (previousPlayback, onPreviousPlaybackChange) = rememberPreference(PreviousPlaybackKey, true)
     val (noAudioSource, onNoAudioSourceChange) = rememberPreference(NoAudioSourceKey, false)
@@ -88,6 +92,15 @@ fun PlaySetting(
                     }
                 }
                 ToggleRow(stringResource(R.string.loop_playback), "arrow.trianglehead.2.clockwise.rotate.90", loopPlayback, onLoopPlaybackChange)
+                ToggleRow(
+                    stringResource(R.string.loudness_normalization), "waveform", loudnessEnabled, onLoudnessEnabledChange,
+                    description = stringResource(R.string.loudness_normalization_description),
+                )
+                if (loudnessEnabled) {
+                    val safeTarget = loudnessTarget.takeIf { it.isFinite() }?.coerceIn(-20f, -10f) ?: -16f
+                    SliderRow(stringResource(R.string.loudness_target, safeTarget.roundToInt()),
+                        safeTarget, { onLoudnessTargetChange(it.roundToInt().toFloat()) }, -20f..-10f)
+                }
                 ToggleRow(
                     stringResource(R.string.cloud_shuffle), "shuffle", cloudShuffle, onCloudShuffleChange,
                     description = stringResource(R.string.cloud_shuffle_description),

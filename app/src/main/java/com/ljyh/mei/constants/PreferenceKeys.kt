@@ -9,6 +9,8 @@ import com.ljyh.mei.playback.PlayMode
 import com.materialkolor.scheme.DynamicScheme
 
 val LastHomePageTime = longPreferencesKey("lastHomePageTime")
+val LoudnessNormalizationEnabledKey = booleanPreferencesKey("loudnessNormalization.enabled")
+val LoudnessNormalizationTargetKey = floatPreferencesKey("loudnessNormalization.targetLufs")
 val LastHomePageData_1 = stringPreferencesKey("lastHomePageData_1")
 val LastHomePageData_2 = stringPreferencesKey("lastHomePageData_2")
 val HideExplicitKey = booleanPreferencesKey("hideExplicit")

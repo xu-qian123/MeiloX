@@ -113,7 +113,8 @@ private data class BiquadCoefficients(
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class TenBandEqualizerProcessor(
-    private val state: EqualizerConfigurationState,
+    private val configuration: () -> EqualizerConfiguration,
+    private val loudnessConfiguration: () -> LoudnessConfiguration = { LoudnessConfiguration.Disabled },
 ) : BaseAudioProcessor() {
     private companion object {
         const val BYPASS_EPSILON = 0.0001f
@@ -133,7 +134,9 @@ class TenBandEqualizerProcessor(
     private val a2 = FloatArray(BAND_COUNT)
     private var firstDelays = FloatArray(0)
     private var secondDelays = FloatArray(0)
-    private var channelCursor = 0
+    private var normalizer: LoudnessNormalizer? = null
+    private var frame = FloatArray(0)
+    private var pendingFrame = ByteBuffer.allocate(0)
 
     override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         if (inputAudioFormat.encoding !in setOf(C.ENCODING_PCM_16BIT, C.ENCODING_PCM_FLOAT)) {
@@ -142,9 +145,12 @@ class TenBandEqualizerProcessor(
         sampleRate = inputAudioFormat.sampleRate
         channelCount = inputAudioFormat.channelCount
         encoding = inputAudioFormat.encoding
+        frame = FloatArray(channelCount)
+        pendingFrame = ByteBuffer.allocate(channelCount * if (encoding == C.ENCODING_PCM_FLOAT) 4 else 2)
+            .order(ByteOrder.nativeOrder())
+        normalizer = LoudnessNormalizer(sampleRate, channelCount)
         firstDelays = FloatArray(channelCount * EqualizerBand.entries.size)
         secondDelays = FloatArray(channelCount * EqualizerBand.entries.size)
-        channelCursor = 0
         appliedConfiguration = null
         bypassed = true
         return inputAudioFormat
@@ -155,25 +161,34 @@ class TenBandEqualizerProcessor(
         // initially uses that same buffer, so a bulk copy would copy it into itself.
         if (!inputBuffer.hasRemaining()) return
 
-        val output = replaceOutputBuffer(inputBuffer.remaining()).order(ByteOrder.nativeOrder())
+        val frameBytes = pendingFrame.capacity()
+        val outputBytes = (inputBuffer.remaining() + pendingFrame.position()) / frameBytes * frameBytes
+        val output = replaceOutputBuffer(outputBytes).order(ByteOrder.nativeOrder())
         inputBuffer.order(ByteOrder.nativeOrder())
         refreshConfiguration()
-        if (bypassed) {
+        val loudness = loudnessConfiguration()
+        if (bypassed && !loudness.enabled && normalizer?.needsProcessing != true &&
+            pendingFrame.position() == 0 && inputBuffer.remaining() % frameBytes == 0) {
             output.put(inputBuffer)
             output.flip()
             return
         }
-        when (encoding) {
-            C.ENCODING_PCM_FLOAT -> while (inputBuffer.remaining() >= Float.SIZE_BYTES) {
-                output.putFloat(process(inputBuffer.float, channelCursor))
-                channelCursor = (channelCursor + 1) % channelCount
+        while (inputBuffer.hasRemaining()) {
+            while (inputBuffer.hasRemaining() && pendingFrame.hasRemaining()) pendingFrame.put(inputBuffer.get())
+            if (pendingFrame.hasRemaining()) break
+            pendingFrame.flip()
+            for (channel in 0 until channelCount) {
+                val raw = if (encoding == C.ENCODING_PCM_FLOAT) pendingFrame.float else pendingFrame.short / 32768f
+                val sample = if (raw.isFinite()) raw else 0f
+                frame[channel] = if (bypassed) sample else process(sample, channel)
             }
-            C.ENCODING_PCM_16BIT -> while (inputBuffer.remaining() >= Short.SIZE_BYTES) {
-                val sample = inputBuffer.short / Short.MAX_VALUE.toFloat()
-                val rendered = (process(sample, channelCursor).coerceIn(-1f, 1f) * Short.MAX_VALUE).toInt().toShort()
-                output.putShort(rendered)
-                channelCursor = (channelCursor + 1) % channelCount
+            // Keep EQ output in floating point until both gain and peak protection have run.
+            normalizer?.process(frame, loudness)
+            for (channel in 0 until channelCount) {
+                if (encoding == C.ENCODING_PCM_FLOAT) output.putFloat(frame[channel])
+                else output.putShort((frame[channel] * 32768f).toInt().coerceIn(-32768, 32767).toShort())
             }
+            pendingFrame.clear()
         }
         output.flip()
     }
@@ -181,7 +196,13 @@ class TenBandEqualizerProcessor(
     override fun onFlush() {
         firstDelays.fill(0f)
         secondDelays.fill(0f)
-        channelCursor = 0
+        resetLoudness()
+    }
+
+    /** Called on the playback thread at sink discontinuities, including gapless stream changes. */
+    fun resetLoudness() {
+        normalizer?.reset()
+        pendingFrame.clear()
     }
 
     override fun onReset() {
@@ -193,11 +214,13 @@ class TenBandEqualizerProcessor(
         preampMultiplier = 1f
         firstDelays = FloatArray(0)
         secondDelays = FloatArray(0)
-        channelCursor = 0
+        normalizer = null
+        frame = FloatArray(0)
+        pendingFrame = ByteBuffer.allocate(0)
     }
 
     private fun refreshConfiguration() {
-        val configuration = state.snapshot()
+        val configuration = configuration()
         if (configuration == appliedConfiguration) return
         appliedConfiguration = configuration
         var configurationBypassed = !configuration.enabled || abs(configuration.preamp) < BYPASS_EPSILON
