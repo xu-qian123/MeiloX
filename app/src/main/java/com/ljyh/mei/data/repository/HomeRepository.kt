@@ -9,6 +9,7 @@ import com.ljyh.mei.AppContext
 import com.ljyh.mei.constants.LastHomePageData_1
 import com.ljyh.mei.constants.LastHomePageData_2
 import com.ljyh.mei.constants.LastHomePageTime
+import com.ljyh.mei.constants.AndroidIdKey
 import com.ljyh.mei.data.model.eapi.HomePageResourceShow
 import com.ljyh.mei.data.model.api.GetSearch
 import com.ljyh.mei.data.model.api.SearchResult
@@ -22,7 +23,7 @@ import com.ljyh.mei.data.network.safeApiCall
 import com.ljyh.mei.utils.cache.CacheFile
 import com.ljyh.mei.utils.cache.CacheFile.isNewDay
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
+import com.ljyh.mei.utils.netease.NeteaseUtils.getAndroidId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -40,7 +41,12 @@ class HomeRepository(private val eApiService: EApiService, private val apiServic
         if (isNewDay(getLastFetchTime(context)) || refresh) {
             Timber.tag("getHomePageResourceShow").d("新加载")
             val page1 =
-                eApiService.getHomePageResourceShow(buildGetHomePageResourceShow(refresh = refresh.toString()))
+                eApiService.getHomePageResourceShow(
+                    buildGetHomePageResourceShow(
+                        refresh = refresh.toString(),
+                        androidId = context.dataStore.data.first()[AndroidIdKey] ?: getAndroidId(),
+                    )
+                )
 //            val page2 = eApiService.getHomePageResourceShow(
 //                buildGetHomePageResourceShow(refresh = refresh.toString())
 //            )

@@ -1,0 +1,597 @@
+<?xml version='1.0' encoding='utf-8'?>
+<issues format="6" by="lint 9.4.1" type="baseline" client="gradle" dependencies="false" name="AGP" version="9.4.1">
+    <issue id="MissingPermission" message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`" errorLine1="                AudioRecord(" errorLine2="                ^">
+        <location file="src/main/java/com/ljyh/mei/recognition/SongRecognitionEngine.kt" line="74" column="17" />
+    </issue>
+    <issue id="NonObservableLocale" message="Reading locale in a non-observable way in a composable function" errorLine1="                    String.format(Locale.getDefault(), &quot;%+.1f dB&quot;, value)," errorLine2="                                  ~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/setting/EqualizerSettings.kt" line="153" column="35" />
+    </issue>
+    <issue id="NonObservableLocale" message="Reading locale in a non-observable way in a composable function" errorLine1="    val format = SimpleDateFormat(&quot;MM-dd HH:mm:ss&quot;, Locale.getDefault())" errorLine2="                                                    ~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/log/LogScreen.kt" line="104" column="53" />
+    </issue>
+    <issue id="PictureInPictureIssue" message="An activity in this app supports picture-in-picture and the targetSdkVersion is 31 or above; it is therefore strongly recommended to call both `setAutoEnterEnabled(true)` and `setSourceRectHint(...)`" errorLine1="    &lt;application" errorLine2="     ~~~~~~~~~~~">
+        <location file="src/main/AndroidManifest.xml" line="20" column="6" />
+    </issue>
+    <issue id="RedundantLabel" message="Redundant label can be removed" errorLine1="            android:label=&quot;@string/app_name&quot;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/AndroidManifest.xml" line="53" column="13" />
+    </issue>
+    <issue id="GradleDependency" message="Upgrade `androidx.compose.foundation` for keyboard and mouse support" errorLine1="foundation = &quot;1.11.3&quot;" errorLine2="             ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="8" column="14" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.core:core-ktx than 1.19.0 is available: 1.19.1" errorLine1="coreKtx = &quot;1.19.0&quot;" errorLine2="          ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="12" column="11" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of org.jetbrains.kotlin:kotlin-reflect than 2.3.21 is available: 2.4.0" errorLine1="kotlinReflect = &quot;2.3.21&quot;" errorLine2="                ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="16" column="17" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.lifecycle:lifecycle-runtime-ktx than 2.10.0 is available: 2.11.0" errorLine1="lifecycleRuntimeKtx = &quot;2.10.0&quot;" errorLine2="                      ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="21" column="23" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.compose:compose-bom than 2026.06.00 is available: 2026.09.00" errorLine1="composeBom = &quot;2026.06.00&quot;" errorLine2="             ~~~~~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="23" column="14" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.navigation3:navigation3-runtime than 1.1.6 is available: 1.2.0" errorLine1="navigation3Runtime = &quot;1.1.6&quot;" errorLine2="                     ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="32" column="22" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.navigation:navigation-runtime-ktx than 2.9.8 is available: 2.10.2" errorLine1="navigationRuntimeKtx = &quot;2.9.8&quot;" errorLine2="                       ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="33" column="24" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.navigation:navigation-compose than 2.9.8 is available: 2.10.2" errorLine1="navigationCompose = &quot;2.9.8&quot;" errorLine2="                    ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="34" column="21" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.paging:paging-compose than 3.5.0 is available: 3.5.3" errorLine1="pagingRuntime = &quot;3.5.0&quot;" errorLine2="                ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="35" column="17" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.paging:paging-runtime than 3.5.0 is available: 3.5.3" errorLine1="pagingRuntime = &quot;3.5.0&quot;" errorLine2="                ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="35" column="17" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of com.google.devtools.ksp than 2.3.9 is available: 2.3.10" errorLine1="ksp = &quot;2.3.9&quot;" errorLine2="      ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="39" column="7" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.media3:media3-datasource-okhttp than 1.10.1 is available: 1.11.1" errorLine1="media3 = &quot;1.10.1&quot;" errorLine2="         ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="42" column="10" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.media3:media3-exoplayer than 1.10.1 is available: 1.11.1" errorLine1="media3 = &quot;1.10.1&quot;" errorLine2="         ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="42" column="10" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.media3:media3-session than 1.10.1 is available: 1.11.1" errorLine1="media3 = &quot;1.10.1&quot;" errorLine2="         ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="42" column="10" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.work:work-runtime-ktx than 2.11.2 is available: 2.12.0" errorLine1="workRuntimeKtx = &quot;2.11.2&quot;" errorLine2="                 ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="44" column="18" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of io.github.kyant0:shapes than 1.2.0 is available: 1.2.1" errorLine1="shapes = &quot;1.2.0&quot;" errorLine2="         ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="53" column="10" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.github.luben:zstd-jni than 1.5.7-20 is available: 1.5.7-23" errorLine1="    implementation(&quot;com.github.luben:zstd-jni:1.5.7-20@aar&quot;)" errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="135" column="20" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of org.json:json than 20240303 is available: 20260814" errorLine1="    testImplementation(&quot;org.json:json:20240303&quot;)" errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="137" column="24" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.github.luben:zstd-jni than 1.5.7-20 is available: 1.5.7-23" errorLine1="    testRuntimeOnly(&quot;com.github.luben:zstd-jni:1.5.7-20&quot;)" errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="138" column="21" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.coil-kt.coil3:coil-compose than 3.5.0 is available: 3.6.3" errorLine1="coil = &quot;3.5.0&quot;" errorLine2="       ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="3" column="8" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.coil-kt.coil3:coil-gif than 3.5.0 is available: 3.6.3" errorLine1="coil = &quot;3.5.0&quot;" errorLine2="       ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="3" column="8" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.coil-kt.coil3:coil-network-okhttp than 3.5.0 is available: 3.6.3" errorLine1="coil = &quot;3.5.0&quot;" errorLine2="       ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="3" column="8" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.valentinilk.shimmer:compose-shimmer than 1.4.0 is available: 1.5.0" errorLine1="composeShimmer = &quot;1.4.0&quot;" errorLine2="                 ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="5" column="18" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.github.pdvrieze.xmlutil:serialization-android than 0.90.3 is available: 1.0.2.1" errorLine1="core = &quot;0.90.3&quot;" errorLine2="       ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="6" column="8" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of org.jetbrains.kotlin.android than 2.3.21 is available: 2.4.21" errorLine1="kotlin = &quot;2.3.21&quot;" errorLine2="         ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="11" column="10" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of org.jetbrains.kotlin.plugin.compose than 2.3.21 is available: 2.4.21" errorLine1="kotlin = &quot;2.3.21&quot;" errorLine2="         ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="11" column="10" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of org.jetbrains.kotlin.plugin.serialization than 2.3.21 is available: 2.4.21" errorLine1="kotlin = &quot;2.3.21&quot;" errorLine2="         ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="11" column="10" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.ktor:ktor-client-android than 3.5.0 is available: 3.6.0" errorLine1="ktorClientAndroid = &quot;3.5.0&quot;" errorLine2="                    ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="19" column="21" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.ktor:ktor-client-core than 3.5.0 is available: 3.6.0" errorLine1="ktorClientCore = &quot;3.5.0&quot;" errorLine2="                 ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="20" column="18" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.squareup.okhttp3:logging-interceptor than 5.4.0 is available: 5.5.0" errorLine1="loggingInterceptor = &quot;5.4.0&quot;" errorLine2="                     ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="24" column="22" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.mocharealm.accompanist:lyrics-core than 0.4.5 is available: 0.5.0" errorLine1="lyricsCoreVersion = &quot;0.4.5&quot;" errorLine2="                    ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="25" column="21" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.github.biezhi:TinyPinyin than 2.0.3.RELEASE is available: 2.0.3" errorLine1="tinyPinyinVersion = &quot;2.0.3.RELEASE&quot;" errorLine2="                    ~~~~~~~~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="27" column="21" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.materialkolor:material-kolor than 4.1.1 is available: 5.0.1" errorLine1="materialKolor = &quot;4.1.1&quot;" errorLine2="                ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="30" column="17" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.google.dagger.hilt.android than 2.59.2 is available: 2.60.1" errorLine1="hilt = &quot;2.59.2&quot;" errorLine2="       ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="38" column="8" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.google.dagger:hilt-compiler than 2.59.2 is available: 2.60.1" errorLine1="hilt = &quot;2.59.2&quot;" errorLine2="       ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="38" column="8" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of org.jetbrains:annotations than 26.0.2-1 is available: 26.1.0" errorLine1="annotations = &quot;26.0.2-1&quot;" errorLine2="              ~~~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="46" column="15" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.github.skydoves:cloudy than 0.5.0 is available: 0.7.1" errorLine1="cloudy = &quot;0.5.0&quot;" errorLine2="         ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="50" column="10" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of io.github.kyant0:backdrop than 2.0.0 is available: 2.0.1" errorLine1="backdrop = &quot;2.0.0&quot;" errorLine2="           ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="52" column="12" />
+    </issue>
+    <issue id="NewerVersionAvailable" message="A newer version of com.microsoft.onnxruntime:onnxruntime-android than 1.28.0 is available: 1.31.0" errorLine1="onnxRuntime = &quot;1.28.0&quot;" errorLine2="              ~~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="55" column="15" />
+    </issue>
+    <issue id="RestrictedApi" message="MediaSessionCompat.getMediaSession can only be called from within the same library (androidx.media3:media3-session)" errorLine1="                .getMediaSessionLegacyStub().getSessionCompat().getMediaSession();" errorLine2="                                                                ~~~~~~~~~~~~~~~">
+        <location file="src/main/java/androidx/media3/session/PlatformLyricsSessionAccess.java" line="16" column="65" />
+    </issue>
+    <issue id="VisibleForTests" message="This method should only be accessed from tests or within private scope" errorLine1="        savedStateHandles.getOrPut(route) { SavedStateHandle() }" errorLine2="                                            ~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/navigation/MeiNavigation.kt" line="74" column="45" />
+    </issue>
+    <issue id="ComposableNaming" message="Composable functions that return Unit should start with an uppercase letter" errorLine1="fun navigationEntry(" errorLine2="    ~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/NavigationBuilder.kt" line="335" column="5" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenHeightDp instead of LocalWindowInfo.current.containerSize" errorLine1="    val screenHeight = LocalConfiguration.current.screenHeightDp.dp" errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/Dialog.kt" line="164" column="24" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenHeightDp instead of LocalWindowInfo.current.containerSize" errorLine1="    val screenHeight = LocalConfiguration.current.screenHeightDp.dp" errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/sheet/LyricMatchSheet.kt" line="71" column="24" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenHeightDp instead of LocalWindowInfo.current.containerSize" errorLine1="                    val keepAliveZone = LocalConfiguration.current.screenHeightDp.dp" errorLine2="                                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/LyricScreen.kt" line="248" column="41" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenHeightDp instead of LocalWindowInfo.current.containerSize" errorLine1="    val screenHeight = LocalConfiguration.current.screenHeightDp.dp" errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/sheet/LyricsEditorSheet.kt" line="161" column="24" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenHeightDp instead of LocalWindowInfo.current.containerSize" errorLine1="    return remember(context, view, hostBounds, configuration.screenWidthDp, configuration.screenHeightDp) {" errorLine2="                                                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/sheet/PlayerSheetRenderer.kt" line="607" column="77" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenWidthDp instead of LocalWindowInfo.current.containerSize" errorLine1="    return remember(context, view, hostBounds, configuration.screenWidthDp, configuration.screenHeightDp) {" errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/sheet/PlayerSheetRenderer.kt" line="607" column="48" />
+    </issue>
+    <issue id="ConfigurationScreenWidthHeight" message="Using Configuration.screenWidthDp instead of LocalWindowInfo.current.containerSize" errorLine1="    val screenWidthPx = with(LocalDensity.current) { configuration.screenWidthDp.dp.toPx() }" errorLine2="                                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/SingleImagePickerSheet.kt" line="46" column="54" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                context.getString(R.string.resumed_download)," errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/setting/DownloadManageScreen.kt" line="159" column="33" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="        ?: context.getString(R.string.lyrics_waiting)" errorLine2="           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/FloatingLyricsPip.kt" line="128" column="12" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                        playlistName = context.getString(R.string.resumed_download)," errorLine2="                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/main/library/component/LibraryMobileLayout.kt" line="580" column="40" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                                putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.listen_invitation_subject))" errorLine2="                                                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/listentogether/ListenTogetherScreen.kt" line="82" column="80" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                                putExtra(Intent.EXTRA_TEXT, context.getString(R.string.listen_invitation_message, invitationUrl))" errorLine2="                                                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/listentogether/ListenTogetherScreen.kt" line="83" column="77" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                            context.getString(R.string.listen_invite)," errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/listentogether/ListenTogetherScreen.kt" line="85" column="45" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                    context.getString(R.string.system_share)," errorLine2="                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/social/NeteaseShareSheet.kt" line="201" column="37" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                            context.getString(R.string.queue_cannot_remove_last)," errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/sheet/PlaylistBottomSheet.kt" line="236" column="45" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                android.widget.Toast.makeText(context, context.getString(R.string.detail_download_queued, songs.size), android.widget.Toast.LENGTH_SHORT).show()" errorLine2="                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/podcast/PodcastScreen.kt" line="442" column="56" />
+    </issue>
+    <issue id="LocalContextGetResourceValueCall" message="Querying resource values using LocalContext.current" errorLine1="                                context.getString(R.string.message_copy_content)," errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/social/SocialScreens.kt" line="371" column="33" />
+    </issue>
+    <issue id="ModifierFactoryExtensionFunction" message="Modifier factory functions should be extensions on Modifier" errorLine1="internal fun rememberMorphingNavigationGlass(" errorLine2="             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/glass/GlassMorphRenderer.kt" line="212" column="14" />
+    </issue>
+    <issue id="ModifierFactoryExtensionFunction" message="Modifier factory functions should be extensions on Modifier" errorLine1="    fun highlightModifier(" errorLine2="        ~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/liquidglass/InteractiveHighlight.kt" line="76" column="9" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier" errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/overlay/CommonOverlayHandler.kt" line="55" column="5" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier," errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/main/findmusic/FindMusicScreen.kt" line="67" column="5" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier" errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/FluidBackground.kt" line="58" column="5" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier," errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/glass/Ios27Components.kt" line="1246" column="5" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier," errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/glass/Ios27Components.kt" line="1519" column="5" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier," errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/glass/IosPinnedListPage.kt" line="248" column="5" />
+    </issue>
+    <issue id="ModifierParameter" message="Modifier parameter should be the first optional parameter" errorLine1="    modifier: Modifier = Modifier," errorLine2="    ~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/sheet/LyricsEditorSheet.kt" line="441" column="5" />
+    </issue>
+    <issue id="BinaryOperationInTimber" message="Replace String concatenation with Timber's string formatting" errorLine1="                        &quot;Restored playback snapshot -&gt; items: ${restoredItems.size}, &quot; +" errorLine2="                        ^">
+        <location file="src/main/java/com/ljyh/mei/playback/MusicService.kt" line="382" column="25" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.e(TAG, &quot;an error occured when collect package info&quot;, e)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/log/CrashHandler.kt" line="98" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.e(TAG, &quot;Crash log saved to: ${file.absolutePath}&quot;)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/log/CrashHandler.kt" line="143" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.e(TAG, &quot;an error occured while writing file...&quot;, e)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/log/CrashHandler.kt" line="146" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.e(&quot;FileLoggingTree&quot;, &quot;Error writing log to file&quot;, e)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/log/FileLoggingTree.kt" line="66" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.d(TAG, &quot;没有权限&quot;)" errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/NotificationHelper.kt" line="51" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.d(TAG, &quot;没有权限&quot;)" errorLine2="            ~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/NotificationHelper.kt" line="71" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                    Log.w(TAG, &quot;Cloud shuffle failed; continuing the existing local shuffle&quot;)" errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="163" column="21" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                Log.w(TAG, &quot;Server shuffle unavailable; keeping the local playback order&quot;, error)" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="171" column="17" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.e(TAG, &quot;FM Fetch Error&quot;, e)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="330" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                Log.e(TAG, &quot;Trash failed&quot;, e)" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="360" column="17" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                    Log.e(TAG, &quot;Unable to hydrate selected item ${allIds[startIndex].first}&quot;)" errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="399" column="21" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                Log.e(TAG, &quot;playQueue Error&quot;, e)" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="457" column="17" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.w(TAG, &quot;Shuffle is not allowed in FM mode&quot;)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="500" column="13" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                Log.e(TAG, &quot;Fetch Metadata Failed&quot;, e)" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="585" column="17" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                Log.w(TAG, &quot;Queue hydration failed&quot;, error)" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="669" column="17" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="                Log.e(TAG, &quot;Failed to load song details&quot;, e)" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackQueueManager.kt" line="723" column="17" />
+    </issue>
+    <issue id="LogNotTimber" message="Using 'Log' instead of 'Timber'" errorLine1="            Log.e(&quot;QRCUtils&quot;, &quot;decodeLyric: ${e.message}&quot;)" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/encrypt/QRCUtils.kt" line="533" column="13" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;songs&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;playlist_song_count&quot;&gt;%1$d songs&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="25" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;minutes&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;sleep_timer_stops_in&quot;&gt;Playback stops in %1$d minutes&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="57" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;episodes&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;podcast_program_count&quot;&gt;%1$d episodes&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="131" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;selected&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;share_recipients_count&quot;&gt;Recipients · %1$d selected&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="149" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;members&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;listen_members&quot;&gt;%1$d members&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="165" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;sec&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;automix_duration&quot;&gt;Crossfade · %1$d sec&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="351" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;bars&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;automix_bars&quot;&gt;%1$d bars&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="355" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;bars&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;automix_tail_bars&quot;&gt;-%1$d bars&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="357" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;songs&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;account_track_count&quot;&gt;%1$d songs&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="456" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;songs&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;account_level_listens&quot;&gt;Lv.%1$d · %2$d songs listened&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="457" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;plays&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;account_play_count&quot;&gt;%1$d plays&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="465" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;songs&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;artist_all_songs_count&quot;&gt;All %1$d songs&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="589" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;songs&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;album_download_all&quot;&gt;Download all (%1$d songs)&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="605" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;episodes&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;detail_podcast_download_all&quot;&gt;Download all (%1$d episodes)&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="618" column="5" />
+    </issue>
+    <issue id="PluralsCandidate" message="Formatting %d followed by words (&quot;items&quot;): This should probably be a plural rather than a string" errorLine1="    &lt;string name=&quot;detail_download_queued&quot;&gt;Added %1$d items to downloads&lt;/string&gt;" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="619" column="5" />
+    </issue>
+    <issue id="TrustAllX509TrustManager" message="`checkClientTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers" errorLine1="                override fun checkClientTrusted(chain: Array&lt;out X509Certificate&gt;?, authType: String?) {}" errorLine2="                             ~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/di/NetworkModule.kt" line="72" column="30" />
+    </issue>
+    <issue id="TrustAllX509TrustManager" message="`checkServerTrusted` is empty, which could cause insecure network traffic due to trusting arbitrary TLS/SSL certificates presented by peers" errorLine1="                override fun checkServerTrusted(chain: Array&lt;out X509Certificate&gt;?, authType: String?) {}" errorLine2="                             ~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/di/NetworkModule.kt" line="73" column="30" />
+    </issue>
+    <issue id="CustomX509TrustManager" message="Implementing a custom `X509TrustManager` is error-prone and likely to be insecure. It is likely to disable certificate validation altogether, and is non-trivial to implement correctly without calling Android's default implementation." errorLine1="            val trustAllCerts = arrayOf&lt;TrustManager&gt;(object : X509TrustManager {" errorLine2="                                                      ~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/di/NetworkModule.kt" line="71" column="55" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 31" errorLine1="@RequiresApi(Build.VERSION_CODES.S)" errorLine2="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/AmbientBackground.kt" line="36" column="1" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="    val blurEffect = if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S) {" errorLine2="                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/AmbientBackground.kt" line="94" column="26" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="                    if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.S &amp;&amp; blurEffect != null) {" errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/AmbientBackground.kt" line="117" column="25" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 31" errorLine1="        tools:targetApi=&quot;31&quot;&gt;" errorLine2="        ~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/AndroidManifest.xml" line="34" column="9" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="                val versionCode = if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.P) {" errorLine2="                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/log/CrashHandler.kt" line="88" column="39" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="            if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.Q) {" errorLine2="                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/image/ImageUtils.kt" line="45" column="17" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 31" errorLine1="    @RequiresApi(Build.VERSION_CODES.S)" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/MainActivity.kt" line="234" column="5" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="    if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.TIRAMISU &amp;&amp;" errorLine2="        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/NotificationHelper.kt" line="32" column="9" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.TIRAMISU &amp;&amp;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/NotificationHelper.kt" line="47" column="13" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.TIRAMISU &amp;&amp;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/NotificationHelper.kt" line="67" column="13" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 31" errorLine1="@RequiresApi(Build.VERSION_CODES.S)" errorLine2="~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/Player.kt" line="64" column="1" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="Unnecessary; `SDK_INT` is always &gt;= 33" errorLine1="        if (Build.VERSION.SDK_INT &gt;= Build.VERSION_CODES.TIRAMISU) {" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/overlay/PlayerOverlayHandler.kt" line="230" column="13" />
+    </issue>
+    <issue id="ObsoleteSdkInt" message="This folder configuration (`v26`) is unnecessary; `minSdkVersion` is 33. Merge all the resources in this folder into `mipmap-anydpi`.">
+        <location file="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+    <issue id="StaticFieldLeak" message="Do not place Android context classes in static fields (static reference to `CrashHandler` which has field `mContext` pointing to `Context`); this is a memory leak" errorLine1="object CrashHandler : Thread.UncaughtExceptionHandler {" errorLine2="^">
+        <location file="src/main/java/com/ljyh/mei/utils/log/CrashHandler.kt" line="18" column="1" />
+    </issue>
+    <issue id="StaticFieldLeak" message="Do not place Android context classes in static fields; this is a memory leak" errorLine1="    private lateinit var mContext: Context" errorLine2="    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/log/CrashHandler.kt" line="22" column="5" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.drawable.cloud` appears to be unused">
+        <location file="src/main/res/drawable/cloud.png" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.purple_200` appears to be unused" errorLine1="    &lt;color name=&quot;purple_200&quot;&gt;#FFBB86FC&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="3" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.purple_500` appears to be unused" errorLine1="    &lt;color name=&quot;purple_500&quot;&gt;#FF6200EE&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="4" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.purple_700` appears to be unused" errorLine1="    &lt;color name=&quot;purple_700&quot;&gt;#FF3700B3&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="5" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.teal_200` appears to be unused" errorLine1="    &lt;color name=&quot;teal_200&quot;&gt;#FF03DAC5&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="6" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.teal_700` appears to be unused" errorLine1="    &lt;color name=&quot;teal_700&quot;&gt;#FF018786&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="7" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.black` appears to be unused" errorLine1="    &lt;color name=&quot;black&quot;&gt;#FF000000&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="8" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.color.white` appears to be unused" errorLine1="    &lt;color name=&quot;white&quot;&gt;#FFFFFFFF&lt;/color&gt;" errorLine2="           ~~~~~~~~~~~~">
+        <location file="src/main/res/values/colors.xml" line="9" column="12" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.drawable.empty` appears to be unused">
+        <location file="src/main/res/drawable/empty.png" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.more_actions_sort_title` appears to be unused" errorLine1="    &lt;string name=&quot;more_actions_sort_title&quot;&gt;Sort actions by&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="81" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.music_player` appears to be unused" errorLine1="    &lt;string name=&quot;music_player&quot;&gt;Music Player&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="112" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.error_no_internet` appears to be unused" errorLine1="    &lt;string name=&quot;error_no_internet&quot;&gt;No network connection&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="113" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.error_timeout` appears to be unused" errorLine1="    &lt;string name=&quot;error_timeout&quot;&gt;Timeout&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="114" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.error_unknown` appears to be unused" errorLine1="    &lt;string name=&quot;error_unknown&quot;&gt;Unknown error&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="115" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.clear_search_query` appears to be unused" errorLine1="    &lt;string name=&quot;clear_search_query&quot;&gt;Clear search&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="119" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.search_submit` appears to be unused" errorLine1="    &lt;string name=&quot;search_submit&quot;&gt;Search NetEase Cloud Music&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="120" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.podcast_subscribed` appears to be unused" errorLine1="    &lt;string name=&quot;podcast_subscribed&quot;&gt;Subscribed&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="129" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.podcast_duration_minutes` appears to be unused" errorLine1="    &lt;string name=&quot;podcast_duration_minutes&quot;&gt;%1$d min&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="130" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.share_kind_song` appears to be unused" errorLine1="    &lt;string name=&quot;share_kind_song&quot;&gt;Song&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="151" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.search_discovery_hint` appears to be unused" errorLine1="    &lt;string name=&quot;search_discovery_hint&quot;&gt;Search songs, albums, artists, playlists, and podcasts&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="153" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.listen_room_placeholder` appears to be unused" errorLine1="    &lt;string name=&quot;listen_room_placeholder&quot;&gt;Room ID&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="166" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.listen_inviter_placeholder` appears to be unused" errorLine1="    &lt;string name=&quot;listen_inviter_placeholder&quot;&gt;Inviter ID&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="167" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.general_startup_navigation` appears to be unused" errorLine1="    &lt;string name=&quot;general_startup_navigation&quot;&gt;Startup and Navigation&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="185" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.general_restore_last_tab` appears to be unused" errorLine1="    &lt;string name=&quot;general_restore_last_tab&quot;&gt;Continue on the last tab&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="186" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.general_restore_last_tab_description` appears to be unused" errorLine1="    &lt;string name=&quot;general_restore_last_tab_description&quot;&gt;Returns to the most recently used main tab after launch.&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="187" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.general_default_tab` appears to be unused" errorLine1="    &lt;string name=&quot;general_default_tab&quot;&gt;Default launch tab&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="188" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.appearance_accent_dynamic` appears to be unused" errorLine1="    &lt;string name=&quot;appearance_accent_dynamic&quot;&gt;Artwork&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="211" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.about_check_updates_description` appears to be unused" errorLine1="    &lt;string name=&quot;about_check_updates_description&quot;&gt;Compare this version with the latest GitHub tag.&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="272" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.search_discovery` appears to be unused" errorLine1="    &lt;string name=&quot;search_discovery&quot;&gt;Search Discovery&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="415" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.lyric_copied` appears to be unused" errorLine1="    &lt;string name=&quot;lyric_copied&quot;&gt;Lyric copied&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="521" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.lyric_copy_failed` appears to be unused" errorLine1="    &lt;string name=&quot;lyric_copy_failed&quot;&gt;Could not copy lyric&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="522" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.library_created_playlists` appears to be unused" errorLine1="    &lt;string name=&quot;library_created_playlists&quot;&gt;Created&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="542" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.library_collected_playlists` appears to be unused" errorLine1="    &lt;string name=&quot;library_collected_playlists&quot;&gt;Playlists&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="543" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.library_local_music` appears to be unused" errorLine1="    &lt;string name=&quot;library_local_music&quot;&gt;Local Music&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="545" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.library_empty_created` appears to be unused" errorLine1="    &lt;string name=&quot;library_empty_created&quot;&gt;No created playlists&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="547" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.library_empty_albums` appears to be unused" errorLine1="    &lt;string name=&quot;library_empty_albums&quot;&gt;No collected albums&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="549" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.lyrics_match_search` appears to be unused" errorLine1="    &lt;string name=&quot;lyrics_match_search&quot;&gt;Search&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="641" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.lyrics_secondary_translation_short` appears to be unused" errorLine1="    &lt;string name=&quot;lyrics_secondary_translation_short&quot;&gt;Translation&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="653" column="13" />
+    </issue>
+    <issue id="UnusedResources" message="The resource `R.string.lyrics_secondary_phonetic_short` appears to be unused" errorLine1="    &lt;string name=&quot;lyrics_secondary_phonetic_short&quot;&gt;Phonetic&lt;/string&gt;" errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/res/values/strings.xml" line="654" column="13" />
+    </issue>
+    <issue id="IconLocation" message="Found bitmap drawable `res/drawable/am.png` in densityless folder">
+        <location file="src/main/res/drawable/am.png" />
+    </issue>
+    <issue id="IconLocation" message="Found bitmap drawable `res/drawable/cloud.png` in densityless folder">
+        <location file="src/main/res/drawable/cloud.png" />
+    </issue>
+    <issue id="IconLocation" message="Found bitmap drawable `res/drawable/empty.png` in densityless folder">
+        <location file="src/main/res/drawable/empty.png" />
+    </issue>
+    <issue id="IconLocation" message="Found bitmap drawable `res/drawable/logo.webp` in densityless folder">
+        <location file="src/main/res/drawable/logo.webp" />
+    </issue>
+    <issue id="IconLocation" message="Found bitmap drawable `res/drawable/netease.png` in densityless folder">
+        <location file="src/main/res/drawable/netease.png" />
+    </issue>
+    <issue id="IconLocation" message="Found bitmap drawable `res/drawable/qq.png` in densityless folder">
+        <location file="src/main/res/drawable/qq.png" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }" errorLine2="                                                                   ~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/about/AboutScreen.kt" line="193" column="68" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX function `createBitmap` instead?" errorLine1="            val fallback = Bitmap.createBitmap(32, 32, Bitmap.Config.ARGB_8888)" errorLine2="                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/mesh/AlbumTextureProcessor.kt" line="10" column="28" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `Bitmap.scale` instead?" errorLine1="        var img = Bitmap.createScaledBitmap(bitmap, w, h, true)" errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/mesh/AlbumTextureProcessor.kt" line="16" column="19" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX function `createBitmap` instead?" errorLine1="        img = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)" errorLine2="              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/mesh/AlbumTextureProcessor.kt" line="58" column="15" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX function `createBitmap` instead?" errorLine1="        val result = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)" errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/mesh/AlbumTextureProcessor.kt" line="124" column="22" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `Bitmap.get` instead?" errorLine1="        val pixel = bitmap.getPixel(px, py)" errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/mesh/BHPMesh.kt" line="136" column="21" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                        context.contentResolver.delete(android.net.Uri.parse(path), null, null)" errorLine2="                                                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/Download.kt" line="131" column="56" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                            context.contentResolver.delete(android.net.Uri.parse(path), null, null)" errorLine2="                                                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/utils/Download.kt" line="151" column="60" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX function `createBitmap` instead?" errorLine1="                            Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)" errorLine2="                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/player/component/FluidBackground.kt" line="198" column="29" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                .setArtworkUri(Uri.parse(coverUrl))" errorLine2="                               ~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/data/model/MediaMetadata.kt" line="287" column="32" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                return ResolvedMediaSource(Uri.parse(localPath), requestedQuality, cacheKey = null)" errorLine2="                                           ~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/MediaUriProvider.kt" line="48" column="44" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                        path.startsWith(&quot;content://&quot;) -&gt; Uri.parse(path)" errorLine2="                                                         ~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/MusicService.kt" line="735" column="58" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                    return ResolvedMediaSource(Uri.parse(&quot;meilox-cache:///$mediaId&quot;), quality, key)" errorLine2="                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/MusicService.kt" line="746" column="48" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                        .setUri(Uri.parse(&quot;meilox-cache:///$mediaId&quot;)).setKey(pinnedKey).build()" errorLine2="                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/MusicService.kt" line="754" column="33" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                artworkUri.takeIf { it.isNotBlank() }?.let { setArtworkUri(Uri.parse(it)) }" errorLine2="                                                                           ~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/playback/PlaybackPersistence.kt" line="277" column="76" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `Bitmap.get` instead?" errorLine1="            val pixel = bitmap.getPixel(x, y)" errorLine2="                        ~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/home/RecommendCard.kt" line="286" column="25" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                    if (path.startsWith(&quot;content://&quot;)) context.contentResolver.delete(Uri.parse(path), null, null)" errorLine2="                                                                                      ~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/setting/StorageManagementScreen.kt" line="196" column="87" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="        context.contentResolver.query(Uri.parse(path), arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor -&gt;" errorLine2="                                      ~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/setting/StorageManagementScreen.kt" line="207" column="39" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="        runCatching { context.contentResolver.openFileDescriptor(Uri.parse(path), &quot;r&quot;)?.use { true } ?: false }.getOrDefault(false)" errorLine2="                                                                 ~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/screen/setting/StorageManagementScreen.kt" line="213" column="66" />
+    </issue>
+    <issue id="UseKtx" message="Use the KTX extension function `String.toUri` instead?" errorLine1="                                    Intent(Intent.ACTION_VIEW, Uri.parse(result.releaseUrl))," errorLine2="                                                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="src/main/java/com/ljyh/mei/ui/component/VersionUpdateAlert.kt" line="44" column="64" />
+    </issue>
+    <issue id="UseTomlInstead" message="Use version catalog instead" errorLine1="    implementation(&quot;com.github.luben:zstd-jni:1.5.7-20@aar&quot;)" errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="135" column="20" />
+    </issue>
+    <issue id="UseTomlInstead" message="Use version catalog instead" errorLine1="    testImplementation(&quot;org.json:json:20240303&quot;)" errorLine2="                       ~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="137" column="24" />
+    </issue>
+    <issue id="UseTomlInstead" message="Use version catalog instead" errorLine1="    testRuntimeOnly(&quot;com.github.luben:zstd-jni:1.5.7-20&quot;)" errorLine2="                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="138" column="21" />
+    </issue>
+    <issue id="UseTomlInstead" message="Use version catalog instead" errorLine1="    implementation(&quot;io.github.proify.lyricon:provider:0.1.70&quot;)" errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="202" column="20" />
+    </issue>
+    <issue id="UseTomlInstead" message="Use version catalog instead" errorLine1="    implementation(&quot;com.github.HChenX:SuperLyricApi:3.4&quot;)" errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
+        <location file="build.gradle.kts" line="203" column="20" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.hilt:hilt-navigation-compose than 1.3.0 is available: 1.4.0" errorLine1="hiltNavigationCompose = &quot;1.3.0&quot;" errorLine2="                        ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="40" column="25" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.room:room-compiler than 2.8.4 is available: 2.8.5" errorLine1="roomCompiler = &quot;2.8.4&quot;" errorLine2="               ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="41" column="16" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.room:room-ktx than 2.8.4 is available: 2.8.5" errorLine1="roomCompiler = &quot;2.8.4&quot;" errorLine2="               ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="41" column="16" />
+    </issue>
+    <issue id="GradleDependency" message="A newer version of androidx.room:room-runtime than 2.8.4 is available: 2.8.5" errorLine1="roomCompiler = &quot;2.8.4&quot;" errorLine2="               ~~~~~~~">
+        <location file="../gradle/libs.versions.toml" line="41" column="16" />
+    </issue>
+</issues>

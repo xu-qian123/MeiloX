@@ -7,9 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ljyh.mei.AppContext
 import com.ljyh.mei.constants.DownloadPathKey
-import com.ljyh.mei.constants.DownloadQualityKey
 import com.ljyh.mei.constants.MusicQuality
-import com.ljyh.mei.constants.UserIdKey
 import com.ljyh.mei.data.model.Lyric
 import com.ljyh.mei.data.model.MediaMetadata
 import com.ljyh.mei.data.model.Tracks
@@ -33,7 +31,10 @@ import com.ljyh.mei.ui.model.LyricMatchUiState
 import com.ljyh.mei.ui.model.MoreAction
 import com.ljyh.mei.ui.model.SortOrder
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
+import com.ljyh.mei.utils.currentUserId
+import com.ljyh.mei.utils.playlistsForCurrentUser
+import com.ljyh.mei.utils.downloadQuality
+import com.ljyh.mei.data.network.safeApiCall
 import com.ljyh.mei.utils.lyric.LyricManager
 import com.ljyh.mei.utils.lyric.match.LyricMatchRequest
 import com.ljyh.mei.utils.lyric.match.LyricMatchSource
@@ -93,7 +94,6 @@ class PlayerViewModel @Inject constructor(
 
     var mediaMetadata: MediaMetadata? = null
 
-    val userId = AppContext.instance.dataStore[UserIdKey] ?: ""
 
     val localPlaylists: StateFlow<List<Playlist>> = localPlaylistRepository.getAllPlaylist()
         .stateIn(
@@ -102,8 +102,12 @@ class PlayerViewModel @Inject constructor(
             initialValue = emptyList()
         )
 
-    val myPlaylists: StateFlow<List<Playlist>> = localPlaylistRepository.getAllPlaylist()
-        .map { it.filter { p -> p.author == userId } }
+    val myPlaylists: StateFlow<List<Playlist>> = AppContext.instance.dataStore.data
+        .playlistsForCurrentUser(localPlaylistRepository.getAllPlaylist())
+        .catch {
+            Timber.e(it, "Unable to read current user's playlists")
+            emit(emptyList())
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000L),
@@ -234,8 +238,17 @@ class PlayerViewModel @Inject constructor(
 
 
 
-    fun syncUserPlaylists(uid: String, limit: Int = 100) {
+    fun syncCurrentUserPlaylists(limit: Int = 100) {
         viewModelScope.launch {
+            val uid = when (val result = safeApiCall { AppContext.instance.dataStore.data.currentUserId() }) {
+                is Resource.Success -> result.data
+                is Resource.Error -> {
+                    _networkPlaylistsState.value = result
+                    return@launch
+                }
+                Resource.Loading -> return@launch
+            }
+            if (uid.isEmpty()) return@launch
             _networkPlaylistsState.value = Resource.Loading
             when (val networkResult = userRepository.getUserPlaylist(uid, limit)) {
                 is Resource.Success -> {
@@ -320,13 +333,7 @@ class PlayerViewModel @Inject constructor(
 
     fun downloadSong(metadata: MediaMetadata, context: android.content.Context, requestedQuality: MusicQuality? = null) {
         viewModelScope.launch {
-            val quality = requestedQuality ?: try {
-                val saved = AppContext.instance.dataStore[DownloadQualityKey]
-                if (saved != null) com.ljyh.mei.constants.DownloadQuality.valueOf(saved).toMusicQuality()
-                else MusicQuality.EXHIGH
-            } catch (_: Exception) {
-                MusicQuality.EXHIGH
-            }
+            val quality = AppContext.instance.dataStore.data.downloadQuality(requestedQuality)
 
             val result = playlistRepository.getSongUrlV1(
                 ids = listOf(metadata.id.toString()),
@@ -337,7 +344,7 @@ class PlayerViewModel @Inject constructor(
                 val songData = result.data.fullSourceFor(metadata.id.toString())
                 val url = songData?.url
                 if (url != null) {
-                    val downloadPath = AppContext.instance.dataStore[DownloadPathKey]
+                    val downloadPath = AppContext.instance.dataStore.data.first()[DownloadPathKey]
                         ?: com.ljyh.mei.utils.DownloadManager.getDefaultDownloadPath()
 
                     com.ljyh.mei.utils.DownloadManager.enqueue(

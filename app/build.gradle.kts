@@ -77,6 +77,10 @@ android {
         buildConfig = true
         compose = true
     }
+    lint {
+        baseline = file("lint-baseline.xml")
+        warningsAsErrors = true
+    }
     packaging {
         // Direct-distribution APKs prioritize download size. Android extracts these
         // entries at install time instead of mmap'ing them directly from the APK.

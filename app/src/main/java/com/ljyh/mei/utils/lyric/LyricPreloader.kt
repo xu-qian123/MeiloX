@@ -12,6 +12,9 @@ import com.ljyh.mei.ui.model.LyricData
 import com.ljyh.mei.ui.model.LyricSourceData
 import com.ljyh.mei.utils.encrypt.QRCUtils
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.firstOrNull
@@ -80,6 +83,8 @@ class LyricPreloader @Inject constructor(
     private suspend fun fetchNetEase(id: String): Resource<Lyric> {
         return try {
             repository.getLyricV1(id)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "NetEase preload fetch error")
             Resource.Error("NetEase fetch failed")
@@ -89,6 +94,8 @@ class LyricPreloader @Inject constructor(
     private suspend fun fetchAM(id: String): Resource<String> {
         return try {
             repository.getAMLLyric(id)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "AML preload fetch error")
             Resource.Error("AML fetch failed")
@@ -105,6 +112,8 @@ class LyricPreloader @Inject constructor(
                     localSong.title, localSong.album, localSong.artist,
                     localSong.duration, localSong.qid.toLong()
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.e(e, "QQ preload fetch error")
                 Resource.Error("QQ fetch failed")
@@ -113,6 +122,7 @@ class LyricPreloader @Inject constructor(
 
         // 静默搜索：查询但不写入任何共享 StateFlow
         val best = searchSilent(metadata) ?: return Resource.Error("No QQ match found")
+        currentCoroutineContext().ensureActive()
 
         val qqSong = QQSong(
             id = songId,
@@ -129,6 +139,8 @@ class LyricPreloader @Inject constructor(
                 qqSong.title, qqSong.album, qqSong.artist,
                 qqSong.duration, qqSong.qid.toLong()
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.e(e, "QQ preload fetch error after search")
             Resource.Error("QQ fetch failed")

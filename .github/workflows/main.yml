@@ -2,6 +2,7 @@ name: Build and Release
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
     inputs:
       release_notes:
@@ -13,7 +14,37 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    name: Tests, lint and debug build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify with the repository Wrapper
+        run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --continue --console=plain
+
+      - name: Upload verification reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-reports
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+
   build:
+    if: github.event_name != 'pull_request'
+    needs: verify
     environment: release
     runs-on: ubuntu-latest
     outputs:
@@ -28,10 +59,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: gradle/gradle-build-action@v2
-        with:
-          gradle-version: current
-          arguments: assembleRelease
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build release with the repository Wrapper
+        run: ./gradlew :app:assembleRelease --console=plain
 
       - uses: r0adkll/sign-android-release@v1
         id: sign_app

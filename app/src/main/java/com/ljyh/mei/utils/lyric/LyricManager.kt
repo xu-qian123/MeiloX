@@ -85,6 +85,7 @@ class LyricManager @Inject constructor(
     /** QQ 音乐搜索结果，供手动选歌 sheet 使用 */
     private val _qqSearchResult = MutableStateFlow<Resource<SearchResult>>(Resource.Loading)
     val qqSearchResult: StateFlow<Resource<SearchResult>> = _qqSearchResult.asStateFlow()
+    private val qqSearch = LyricSearchController<SearchResult>(scope) { _qqSearchResult.value = it }
 
     /** 当前歌曲的用户歌词偏移（毫秒）；正值表示歌词加速显示 */
     private val _lyricOffsetMs = MutableStateFlow(0L)
@@ -169,6 +170,8 @@ class LyricManager @Inject constructor(
         currentSongId = songId
         fetchJob?.cancel()
         qqFetchJob?.cancel()
+        qqSearch.cancel()
+        val searchToken = qqSearch.current()
         wordTimedFallbackJob?.cancel()
         qqFinalized = false
         currentCustomEntry = null
@@ -226,7 +229,7 @@ class LyricManager @Inject constructor(
             // 本地/已下载歌曲：优先使用音频文件旁的歌词边车（主歌词 / 翻译 / 音译）。
             // 流媒体曲目没有本地文件路径，这里会快速返回 null。
             val localData = withContext(Dispatchers.IO) { loadLocalSidecarLyric(metadata) }
-            if (currentSongId != songId) return@launch
+            if (!loadSession.isCurrent(loadToken)) return@launch
             if (localData != null) {
                 val displayed = applyCustomTranslationOverlay(localData)
                 _lyricData.value = displayed
@@ -243,11 +246,11 @@ class LyricManager @Inject constructor(
             }
 
             // Room 缓存查找（异步，不阻塞主线程）
-            if (!forceReload && currentSongId == songId) {
+            if (!forceReload && loadSession.isCurrent(loadToken)) {
                 val dbCached = withContext(Dispatchers.IO) {
                     cachedLyricRepository.get(songId).firstOrNull()
                 }
-                if (dbCached != null && currentSongId == songId) {
+                if (dbCached != null && loadSession.isCurrent(loadToken)) {
                     val data = applyCustomTranslationOverlay(dbCached.toLyricData())
                     _lyricData.value = data
                     lyricCache[songId] = data
@@ -259,30 +262,20 @@ class LyricManager @Inject constructor(
             launch { fetchNetEaseLyric(songId, loadToken) }
             launch { fetchAMLLyric(songId, loadToken) }
 
-            // QQ 音乐拉取（带超时控制）
-            val localSong = qqSongRepository.getQQSong(songId).firstOrNull()
-            val qqTimeout = try {
-                QqTimeout.valueOf(
-                    context.dataStore.data.first()[QqTimeoutKey] ?: QqTimeout.Sec8.name
-                ).seconds
-            } catch (_: Exception) {
-                8
-            }
-            try {
-                withTimeout(qqTimeout * 1000L) {
+            // Keep the actual search/lyric/LRC requests inside this child and its deadline.
+            qqFetchJob = launch {
+                val localSong = qqSongRepository.getQQSong(songId).firstOrNull()
+                val selectionSearch: (suspend () -> Unit)? = if (localSong != null) {
+                    { searchAndMatchBest(metadata, loadToken, searchToken) }
+                } else null
+                requestQQLyric(loadToken, selectionSearch) {
                     if (localSong != null) {
-                        fetchQQLyric(localSong)
+                        fetchQQLyric(localSong, loadToken)
                     } else {
-                        autoSearchAndPickBest(metadata)
+                        autoSearchAndPickBest(metadata, loadToken, searchToken)
                     }
                 }
-            } catch (_: TimeoutCancellationException) {
-                qqLyricResult.value = Resource.Error("QQ timed out")
-            }
 
-            // 预加载已有 QQSong 时，补充填充搜索结果供 Sheet 使用
-            if (localSong != null) {
-                launch { searchAndMatchBest(metadata) }
             }
         }
     }
@@ -313,8 +306,14 @@ class LyricManager @Inject constructor(
      *
      * 先按歌名搜索，无 duration 匹配时回退为"歌名+歌手"搜索
      */
-    private suspend fun autoSearchAndPickBest(metadata: MediaMetadata) {
-        val best = searchAndMatchBest(metadata)
+    private suspend fun autoSearchAndPickBest(
+        metadata: MediaMetadata,
+        loadToken: Long,
+        searchToken: Long,
+    ) {
+        val best = searchAndMatchBest(metadata, loadToken, searchToken)
+        currentCoroutineContext().ensureActive()
+        if (!loadSession.canApplyRemote(loadToken)) return
         if (best != null) {
             val qqSong = QQSong(
                 id = metadata.id.toString(),
@@ -325,7 +324,8 @@ class LyricManager @Inject constructor(
                 duration = best.interval
             )
             qqSongRepository.insertSong(qqSong)
-            fetchQQLyric(qqSong)
+            currentCoroutineContext().ensureActive()
+            if (loadSession.canApplyRemote(loadToken)) fetchQQLyric(qqSong, loadToken)
         }
     }
 
@@ -334,42 +334,37 @@ class LyricManager @Inject constructor(
      *
      * @return 匹配到的 QQ 歌曲，未匹配到返回 null
      */
-    private suspend fun searchAndMatchBest(metadata: MediaMetadata): SearchResult.Request.Data.Body.ItemSong? {
+    private suspend fun searchAndMatchBest(
+        metadata: MediaMetadata,
+        loadToken: Long,
+        searchToken: Long,
+    ): SearchResult.Request.Data.Body.ItemSong? {
         val currentDurationSec = metadata.duration / 1000
         val artistName = metadata.artists.firstOrNull()?.name ?: ""
         val title = metadata.title
         val cleanedTitle = cleanTitle(title)
 
-        // 1. 清洗后的歌名
-        if (cleanedTitle != title) {
-            Timber.tag(TAG).d("QQ search : $cleanedTitle")
-            val best = trySearchMatch(cleanedTitle, currentDurationSec)
-            _qqSearchResult.value = trySearchLastResult
-            if (best != null) return best
+        val keywords = buildList {
+            if (cleanedTitle != title) add(cleanedTitle)
+            add(title)
+            if (artistName.isNotBlank()) {
+                if (cleanedTitle != title) add("$cleanedTitle $artistName")
+                add("$title $artistName")
+            }
         }
-
-        // 2. 原始歌名
-        Timber.tag(TAG).d("QQ search retry with: $title")
-        val bestByTitle = trySearchMatch(title, currentDurationSec)
-        _qqSearchResult.value = trySearchLastResult
-        if (bestByTitle != null) return bestByTitle
-
-        // 3. 清洗后歌名+歌手
-        if (artistName.isNotBlank() && cleanedTitle != title) {
-            val combined = "$cleanedTitle $artistName"
-            Timber.tag(TAG).d("QQ search retry with cleanedTitle+artist: $combined")
-            val best = trySearchMatch(combined, currentDurationSec)
-            _qqSearchResult.value = trySearchLastResult
-            if (best != null) return best
-        }
-
-        // 4. 原始歌名+歌手
-        if (artistName.isNotBlank()) {
-            val combined = "$title $artistName"
-            Timber.tag(TAG).d("QQ search retry with title+artist: $combined")
-            val best = trySearchMatch(combined, currentDurationSec)
-            _qqSearchResult.value = trySearchLastResult
-            if (best != null) return best
+        for (keyword in keywords) {
+            currentCoroutineContext().ensureActive()
+            if (!loadSession.canApplyRemote(loadToken)) return null
+            Timber.tag(TAG).d("QQ search: %s", keyword)
+            val result = repository.searchNew(keyword)
+            currentCoroutineContext().ensureActive()
+            if (!loadSession.canApplyRemote(loadToken)) return null
+            qqSearch.publish(searchToken, result) { loadSession.canApplyRemote(loadToken) }
+            if (result is Resource.Success) {
+                result.data.request.data.body.itemSong.take(5).firstOrNull { song ->
+                    abs(currentDurationSec - song.interval) <= 5
+                }?.let { return it }
+            }
         }
 
         return null
@@ -386,29 +381,6 @@ class LyricManager @Inject constructor(
             .replace(Regex("""[\(（][^)）]*[\)）]"""), "")
             .replace(Regex("""\s+"""), " ")
             .trim()
-    }
-
-    /** 缓存最后一次 QQ 搜索结果，供 _qqSearchResult 和预加载流程使用 */
-    private var trySearchLastResult: Resource<SearchResult> = Resource.Loading
-
-    /**
-     * 搜索 QQ 音乐并在前 5 条结果中匹配时长（±5 秒）
-     *
-     * @param keyword 搜索关键词
-     * @param targetDurationSec 目标时长（秒）
-     * @return 匹配到的歌曲，未匹配到返回 null
-     */
-    private suspend fun trySearchMatch(
-        keyword: String,
-        targetDurationSec: Long
-    ): SearchResult.Request.Data.Body.ItemSong? {
-        val result = repository.searchNew(keyword)
-        trySearchLastResult = result
-        if (result !is Resource.Success) return null
-        val songs = result.data.request.data.body.itemSong
-        return songs.take(5).firstOrNull { song ->
-            abs(targetDurationSec - song.interval) <= 5
-        }
     }
 
     /**
@@ -455,32 +427,54 @@ class LyricManager @Inject constructor(
      *
      * 写入 qqLyricResult。若返回 QRC 格式（qrcT ≠ 0），额外拉取 LRC 兜底。
      */
-    fun fetchQQLyric(song: QQSong) {
-        qqFetchJob?.cancel()
-        val loadToken = loadSession.current()
-        qqFetchJob = scope.launch {
-            currentQQSong = song
-            qqLyricResult.value = Resource.Loading
-            try {
-                val result = repository.getLyricNew(
-                    song.title, song.album, song.artist, song.duration, song.qid.toLong()
-                )
-                currentCoroutineContext().ensureActive()
-                if (!loadSession.canApplyRemote(loadToken)) return@launch
-                qqLyricResult.value = result
-                if (result is Resource.Success) {
-                    val qrcT = result.data.musicMusichallSongPlayLyricInfoGetPlayLyricInfo.data.qrcT
-                    if (qrcT != 0) {
-                        fetchQQLyricLrc(song, loadToken)
-                    }
+    private suspend fun fetchQQLyric(song: QQSong, loadToken: Long) {
+        currentCoroutineContext().ensureActive()
+        if (!loadSession.canApplyRemote(loadToken)) return
+        currentQQSong = song
+        qqLyricResult.value = Resource.Loading
+        try {
+            val result = repository.getLyricNew(
+                song.title, song.album, song.artist, song.duration, song.qid.toLong()
+            )
+            currentCoroutineContext().ensureActive()
+            if (!loadSession.canApplyRemote(loadToken)) return
+            qqLyricResult.value = result
+            if (result is Resource.Success) {
+                val qrcT = result.data.musicMusichallSongPlayLyricInfoGetPlayLyricInfo.data.qrcT
+                if (qrcT != 0) {
+                    fetchQQLyricLrc(song, loadToken)
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.e(e, "QQ fetch error")
-                if (loadSession.canApplyRemote(loadToken)) qqLyricResult.value = Resource.Error("QQ fetch failed")
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.e(e, "QQ fetch error")
+            if (loadSession.canApplyRemote(loadToken)) qqLyricResult.value = Resource.Error("QQ fetch failed")
         }
+    }
+
+    private suspend fun requestQQLyric(
+        loadToken: Long,
+        selectionSearch: (suspend () -> Unit)? = null,
+        request: suspend () -> Unit,
+    ) {
+        val timeoutSeconds = readLyricSetting(8) {
+            QqTimeout.valueOf(
+                context.dataStore.data.first()[QqTimeoutKey] ?: QqTimeout.Sec8.name
+            ).seconds
+        }
+        runLyricRequest(
+            timeoutMillis = timeoutSeconds * 1000L,
+            isCurrent = { loadSession.canApplyRemote(loadToken) },
+            onTimeout = {
+                // A slow optional LRC fallback must not discard an already usable QQ lyric.
+                if (qqLyricResult.value is Resource.Loading) {
+                    qqLyricResult.value = Resource.Error("QQ timed out")
+                }
+            },
+            selectionSearch = selectionSearch,
+            request = request,
+        )
     }
 
     /**
@@ -718,9 +712,9 @@ class LyricManager @Inject constructor(
      * 结果写入 [_qqSearchResult]，UI 层通过 [qqSearchResult] 观察。
      */
     fun searchQQSong(keyword: String) {
-        _qqSearchResult.value = Resource.Loading
-        scope.launch {
-            _qqSearchResult.value = repository.searchNew(keyword)
+        val loadToken = loadSession.current()
+        qqSearch.search(isSessionCurrent = { loadSession.isCurrent(loadToken) }) {
+            repository.searchNew(keyword)
         }
     }
 
@@ -730,36 +724,47 @@ class LyricManager @Inject constructor(
      * 插入 QQSong 映射到 Room，然后拉取歌词。
      */
     fun selectQQSongForLyric(metadata: MediaMetadata, song: SearchResult.Request.Data.Body.ItemSong) {
-        scope.launch {
-            val qqSong = QQSong(
-                id = metadata.id.toString(),
-                qid = song.id.toString(),
-                title = song.title,
-                artist = song.singer.joinToString(",") { it.name },
-                album = song.album.title,
-                duration = song.interval
-            )
-            qqSongRepository.insertSong(qqSong)
-            if (lastMetadata?.stableKey() != metadata.stableKey()) return@launch
+        if (lastMetadata?.stableKey() != metadata.stableKey()) return
+        val qqSong = QQSong(
+            id = metadata.id.toString(),
+            qid = song.id.toString(),
+            title = song.title,
+            artist = song.singer.joinToString(",") { it.name },
+            album = song.album.title,
+            duration = song.interval
+        )
+        // A manual selection is an explicit source switch. Cancel the automatic
+        // multi-source load and clear its results so NetEase/AM cannot win the
+        // merge again while the selected QQ lyric is being fetched.
+        currentSongId = metadata.id.toString()
+        lastMetadata = metadata
+        val loadToken = loadSession.begin()
+        currentCustomEntry = null
+        wordTimedFallbackJob?.cancel()
+        fetchJob?.cancel()
+        qqFetchJob?.cancel()
+        qqSearch.cancel()
+        qqFinalized = false
+        netLyricResult.value = Resource.Loading
+        qqLyricResult.value = Resource.Loading
+        amLyricResult.value = Resource.Loading
+        lrcFallbackContent = null
+        _lyricData.value = createDefaultLyricData("歌词加载中", source = LyricSource.Loading)
 
-            // A manual selection is an explicit source switch. Cancel the automatic
-            // multi-source load and clear its results so NetEase/AM cannot win the
-            // merge again while the selected QQ lyric is being fetched.
-            currentSongId = metadata.id.toString()
-            lastMetadata = metadata
-            loadSession.begin()
-            currentCustomEntry = null
-            wordTimedFallbackJob?.cancel()
-            fetchJob?.cancel()
-            qqFetchJob?.cancel()
-            qqFinalized = false
-            netLyricResult.value = Resource.Loading
-            qqLyricResult.value = Resource.Loading
-            amLyricResult.value = Resource.Loading
-            lrcFallbackContent = null
-            _lyricData.value = createDefaultLyricData("歌词加载中", source = LyricSource.Loading)
-
-            fetchQQLyric(qqSong)
+        qqFetchJob = scope.launch {
+            try {
+                qqSongRepository.insertSong(qqSong)
+                currentCoroutineContext().ensureActive()
+                if (!loadSession.canApplyRemote(loadToken)) return@launch
+                requestQQLyric(loadToken) { fetchQQLyric(qqSong, loadToken) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                Timber.e(error, "Could not select QQ lyric")
+                if (loadSession.canApplyRemote(loadToken)) {
+                    qqLyricResult.value = Resource.Error("QQ selection failed")
+                }
+            }
         }
     }
 
@@ -851,6 +856,7 @@ class LyricManager @Inject constructor(
         wordTimedFallbackJob?.cancel()
         fetchJob?.cancel()
         qqFetchJob?.cancel()
+        qqSearch.cancel()
         preloadJob?.cancel()
         currentSongId = null
     }
@@ -914,20 +920,16 @@ class LyricManager @Inject constructor(
      */
     private suspend fun attemptWordTimedFallback(songId: String, loadToken: Long) {
         if (!loadSession.canApplyRemote(loadToken)) return
-        val preferWordTimed = try {
+        val preferWordTimed = readLyricSetting(true) {
             context.dataStore.data.first()[PreferWordTimedLyricsKey] ?: true
-        } catch (_: Exception) {
-            true
         }
         if (!preferWordTimed) return
 
         // 来源偏好：指定来源时只尝试该源，否则按默认兜底顺序。
-        val preferredSource = try {
+        val preferredSource = readLyricSetting<LyricMatchSource?>(null) {
             LyricSourcePreference.fromStorage(
                 context.dataStore.data.first()[LyricSourcePreferenceKey]
             ).matchSource
-        } catch (_: Exception) {
-            null
         }
         val sourceOrder = preferredSource?.let { listOf(it) } ?: automaticWordTimedLyricSourceOrder
 

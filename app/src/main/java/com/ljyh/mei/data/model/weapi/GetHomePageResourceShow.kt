@@ -2,12 +2,7 @@ package com.ljyh.mei.data.model.weapi
 
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
-import com.ljyh.mei.AppContext
-import com.ljyh.mei.constants.AndroidIdKey
 import com.ljyh.mei.constants.AndroidUserAgent
-import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
-import com.ljyh.mei.utils.netease.NeteaseUtils.getAndroidId
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -153,9 +148,10 @@ private object DefaultBuilder {
  * ========================================================= */
 inline fun buildGetHomePageResourceShow(
     refresh: String,
+    androidId: String,
     block: GetHomePageResourceShowDsl.() -> Unit = {}
 ): GetHomePageResourceShow {
-    val dsl = GetHomePageResourceShowDsl(refresh).apply(block)
+    val dsl = GetHomePageResourceShowDsl(refresh, androidId).apply(block)
     return GetHomePageResourceShow(
         pageCode = dsl.pageCode,
         isFirstScreen = dsl.isFirstScreen,
@@ -179,7 +175,8 @@ inline fun buildGetHomePageResourceShow(
 }
 
 class GetHomePageResourceShowDsl(
-    val refresh: String
+    val refresh: String,
+    androidId: String,
 ) {
     var pageCode: String = DefaultBuilder.PAGE_CODE
     var isFirstScreen: String = DefaultBuilder.IS_FIRST_SCREEN
@@ -191,7 +188,7 @@ class GetHomePageResourceShowDsl(
     var callbackParameters: String = DefaultBuilder.CALLBACK_PARAMETERS
     var extJson: String = DefaultBuilder.EXT_JSON
     var pageStyleType: String = DefaultBuilder.PAGE_STYLE_TYPE
-    var adExtJson: String = Gson().toJson(buildAdExtJson { })
+    var adExtJson: String = Gson().toJson(buildAdExtJson(androidId) { })
     var reqTimeStamp: String = System.currentTimeMillis().toString()
     var clientTime: String =
         LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
@@ -202,8 +199,8 @@ class GetHomePageResourceShowDsl(
 }
 
 /* ---------------- AdExtJson 构造器 ---------------- */
-inline fun buildAdExtJson(block: AdExtJsonDsl.() -> Unit = {}): AdExtJson {
-    val dsl = AdExtJsonDsl().apply(block)
+inline fun buildAdExtJson(androidId: String, block: AdExtJsonDsl.() -> Unit = {}): AdExtJson {
+    val dsl = AdExtJsonDsl(androidId).apply(block)
     return AdExtJson(
         terminal = dsl.terminal,
         network = dsl.network,
@@ -258,7 +255,7 @@ inline fun buildAdExtJson(block: AdExtJsonDsl.() -> Unit = {}): AdExtJson {
     )
 }
 
-class AdExtJsonDsl {
+class AdExtJsonDsl(var androidId: String) {
     var terminal: String = "Mi+A3"
     var network: Int = 1
     var op: Int = 0
@@ -272,7 +269,6 @@ class AdExtJsonDsl {
     var mobilename: String = "Mi A3"
     var ipv4: String = "127.0.0.2"
     var ipv6: String = ""
-    var androidId: String = AppContext.instance.dataStore[AndroidIdKey]?:getAndroidId()
     var manufacturer: String = "Xiaomi"
     var lbs: String = """{"latitude":"4.9E-324","longitude":"4.9E-324"}"""
     var opensdkVer: Int = 638065664

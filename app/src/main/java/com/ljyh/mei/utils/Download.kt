@@ -164,12 +164,12 @@ object DownloadManager {
         WorkManager.getInstance(context).cancelAllWorkByTag("download")
     }
 
-    fun isSongDownloaded(songId: String): Boolean {
+    suspend fun isSongDownloaded(songId: String): Boolean {
         val db = AppDatabase.getDatabase(AppContext.instance)
-        val song = kotlinx.coroutines.runBlocking { db.songDao().getSong(songId).first() }
+        val song = db.songDao().getSong(songId).first()
         val path = song?.path ?: return false
         if (path.startsWith("content://")) return true
-        return File(path).exists()
+        return withContext(Dispatchers.IO) { File(path).exists() }
     }
 
     suspend fun isSongDownloading(songId: String): Boolean {

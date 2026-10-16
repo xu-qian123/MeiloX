@@ -193,7 +193,6 @@ import com.ljyh.mei.ui.theme.MusicTheme
 import com.ljyh.mei.utils.log.CrashHandler
 import com.ljyh.mei.utils.cache.preloadImage
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
 import com.ljyh.mei.utils.log.FileLoggingTree
 import com.ljyh.mei.utils.netease.NeteaseUtils.getAndroidId
 import com.ljyh.mei.utils.rememberPreference
@@ -305,6 +304,7 @@ class MainActivity : ComponentActivity() {
                     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
                         Timber.tag("MainActivity").d("Service Connected") // 添加日志
                         if (service is MusicService.MusicBinder) {
+                            playerConnection?.dispose()
                             // 更新 State，触发 Recomposition
                             playerConnection = PlayerConnection(
                                 context,
@@ -329,6 +329,7 @@ class MainActivity : ComponentActivity() {
                 onDispose {
                     // Compose 销毁时解绑
                     context.unbindService(connection)
+                    playerConnection?.dispose()
                     playerConnection = null
                 }
             }
@@ -680,9 +681,11 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) {
                         lifecycleScope.launch {
                             getAndroidId(this@MainActivity)
-                            if (dataStore.get(DeviceIdKey, "").isEmpty()) {
-                                dataStore.edit { settings ->
-                                    settings[DeviceIdKey] = com.ljyh.mei.utils.getDeviceId()
+                            dataStore.edit { settings ->
+                                if (settings[DeviceIdKey].isNullOrEmpty()) {
+                                    settings[DeviceIdKey] = withContext(Dispatchers.IO) {
+                                        com.ljyh.mei.utils.getDeviceId()
+                                    }
                                 }
                             }
                         }

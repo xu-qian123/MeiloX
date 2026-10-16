@@ -7,7 +7,7 @@ import com.ljyh.mei.constants.AndroidUserAgent
 import com.ljyh.mei.utils.dataStore
 import com.ljyh.mei.utils.encrypt.encryptId
 import com.ljyh.mei.utils.encrypt.generateRandomMac
-import com.ljyh.mei.utils.get
+import kotlinx.coroutines.flow.first
 import korlibs.encoding.Base64
 import kotlin.text.buildString
 import kotlin.text.isEmpty
@@ -61,7 +61,7 @@ object NeteaseUtils {
     }
 
     suspend fun getAndroidId(context: Context): String {
-        val androidId = context.dataStore[AndroidIdKey] ?: ""
+        val androidId = context.dataStore.data.first()[AndroidIdKey] ?: ""
         if (androidId.isEmpty()) {
             val androidId = Base64.encode(
                 "null\t${generateRandomMac()}\t${getRandomHex()}\t${getRandomHex()}".toByteArray(),

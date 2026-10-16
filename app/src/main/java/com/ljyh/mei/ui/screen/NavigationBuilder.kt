@@ -12,7 +12,6 @@ import androidx.navigation.navArgument
 import androidx.compose.ui.platform.LocalContext
 import com.ljyh.mei.di.AppDatabase
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import java.net.URLDecoder
 import com.ljyh.mei.ui.screen.about.AboutScreen
 import com.ljyh.mei.ui.screen.album.AlbumDetailScreen

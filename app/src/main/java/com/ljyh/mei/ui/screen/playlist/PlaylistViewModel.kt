@@ -9,7 +9,6 @@ import androidx.paging.cachedIn
 import androidx.paging.filter
 import com.ljyh.mei.AppContext
 import com.ljyh.mei.constants.MusicQuality
-import com.ljyh.mei.constants.UserIdKey
 import com.ljyh.mei.data.model.MediaMetadata
 import com.ljyh.mei.data.model.PlaylistDetail
 import com.ljyh.mei.data.model.Tracks
@@ -28,7 +27,9 @@ import com.ljyh.mei.data.repository.PlaylistRepository
 import com.ljyh.mei.data.repository.UserRepository
 import com.ljyh.mei.di.repository.LikeRepository
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
+import com.ljyh.mei.utils.currentUserId
+import com.ljyh.mei.utils.reportException
+import com.ljyh.mei.data.network.safeApiCall
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -56,7 +57,6 @@ class PlaylistViewModel @Inject constructor(
     private val localPlaylistRepository: com.ljyh.mei.di.repository.LocalPlaylistRepository,
     val apiService: ApiService
 ) : ViewModel() {
-    val userId = AppContext.instance.dataStore[UserIdKey] ?: ""
     private val _playlistDetail = MutableStateFlow<Resource<PlaylistDetail>>(Resource.Loading)
     val playlistDetail: StateFlow<Resource<PlaylistDetail>> = _playlistDetail
 
@@ -176,6 +176,14 @@ class PlaylistViewModel @Inject constructor(
     }
     fun getAllMePlaylist(){
         viewModelScope.launch {
+            val userId = when (val result = safeApiCall { AppContext.instance.dataStore.data.currentUserId() }) {
+                is Resource.Success -> result.data
+                is Resource.Error -> {
+                    reportException(IllegalStateException(result.message))
+                    return@launch
+                }
+                Resource.Loading -> return@launch
+            }
             _playlist.value = localPlaylistRepository.getPlaylistByAuthor(userId)
             if (userId.isNotEmpty()) {
                 when (val result = userRepository.getUserPlaylist(userId, 100)) {

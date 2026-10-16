@@ -15,10 +15,8 @@ import androidx.media3.common.Player.REPEAT_MODE_ONE
 import androidx.media3.common.Player.STATE_ENDED
 import androidx.media3.common.Timeline
 import androidx.media3.common.util.UnstableApi
-import com.ljyh.mei.constants.LoopPlaybackKey
 import com.ljyh.mei.constants.MusicQuality
 import com.ljyh.mei.constants.MusicQualityKey
-import com.ljyh.mei.constants.PreviousPlaybackKey
 import com.ljyh.mei.data.model.metadata
 import com.ljyh.mei.data.model.toMediaItem
 import com.ljyh.mei.data.model.toMediaMetadata
@@ -31,7 +29,6 @@ import com.ljyh.mei.extensions.mediaItems
 import com.ljyh.mei.playback.queue.ListQueue
 import com.ljyh.mei.playback.queue.Queue
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
 import com.ljyh.mei.utils.reportException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -90,6 +87,9 @@ class PlayerConnection(
     val error = MutableStateFlow<PlaybackException?>(null)
 
     private var qualityChangeJob: Job? = null
+    private val settingsActions = PlaybackSettingsActions(scope, service.dataStore.data) {
+        reportException(it)
+    }
 
     init {
         player.addListener(this)
@@ -187,8 +187,8 @@ class PlayerConnection(
         }
     }
 
-    fun seekToPrevious() {
-        if(service.dataStore[PreviousPlaybackKey] ?: true){
+    fun seekToPrevious() = settingsActions.submit { settings ->
+        if (settings.previousPlayback) {
             if (player.hasPreviousMediaItem()) {
                 player.seekToPreviousMediaItem()
             } else {
@@ -205,7 +205,7 @@ class PlayerConnection(
      * 切换播放模式
      * 逻辑：列表循环 (REPEAT_ALL) -> 随机播放 (SHUFFLE) -> 单曲循环 (REPEAT_ONE) -> ...
      */
-    fun switchPlayMode() {
+    fun switchPlayMode() = settingsActions.submit { settings ->
         // 基于当前的 UI 状态决定下一步
         // 注意：这里不需要返回 Int，因为操作完 Player 后，ExoPlayer 会回调 Listener，
         // Listener 会调用 updatePlayModeState() 更新 repeatMode Flow，
@@ -216,7 +216,7 @@ class PlayerConnection(
         // 判断用户是否开启了“列表循环”设置
         // 如果开启：列表模式 = REPEAT_MODE_ALL
         // 如果关闭：列表模式 = REPEAT_MODE_OFF (播完停止)
-        val shouldLoopAll = service.dataStore[LoopPlaybackKey] == true
+        val shouldLoopAll = settings.loopPlayback
 
         when (currentUiMode) {
             PlayMode.REPEAT_MODE_ALL -> {
@@ -325,6 +325,7 @@ class PlayerConnection(
     }
 
     fun dispose() {
+        settingsActions.close()
         qualityChangeJob?.cancel()
         qualityChangeJob = null
         player.removeListener(this)

@@ -14,9 +14,10 @@ import com.ljyh.mei.data.repository.PlaylistRepository
 import com.ljyh.mei.di.AppDatabase
 import com.ljyh.mei.utils.DownloadManager
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.get
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
@@ -32,13 +33,14 @@ class AutomaticCacheController @Inject constructor(
         val songId = mediaItem.mediaId.takeIf(String::isNotBlank) ?: return
         database.downloadDao().recordPlayback(songId)
         val count = database.downloadDao().playbackCount(songId) ?: return
-        if (context.dataStore[AutoCacheEnabledKey] != true) return
-        val threshold = (context.dataStore[AutoCachePlaybackThresholdKey] ?: 5)
+        val preferences = context.dataStore.data.first()
+        if (preferences[AutoCacheEnabledKey] != true) return
+        val threshold = (preferences[AutoCachePlaybackThresholdKey] ?: 5)
             .takeIf { it in setOf(3, 5, 10, 20) } ?: 5
         if (count < threshold || hasLocalCopy(songId) || isActive(songId)) return
 
         val quality = runCatching {
-            DownloadQuality.valueOf(context.dataStore[AutoCacheQualityKey] ?: DownloadQuality.EXHIGH.name)
+            DownloadQuality.valueOf(preferences[AutoCacheQualityKey] ?: DownloadQuality.EXHIGH.name)
         }.getOrDefault(DownloadQuality.EXHIGH)
         val result = repository.getSongUrlV1(listOf(songId), quality.toMusicQuality())
         val source = (result as? Resource.Success)?.data?.fullSourceFor(songId)
@@ -69,7 +71,7 @@ class AutomaticCacheController @Inject constructor(
             ),
             playlistName = context.getString(R.string.automatic_cache),
             playlistId = "automatic_$songId",
-            downloadPath = context.dataStore[DownloadPathKey] ?: DownloadManager.getDefaultDownloadPath(),
+            downloadPath = context.dataStore.data.first()[DownloadPathKey] ?: DownloadManager.getDefaultDownloadPath(),
         )
     }
 
@@ -82,6 +84,6 @@ class AutomaticCacheController @Inject constructor(
 
     private suspend fun hasLocalCopy(songId: String): Boolean {
         val path = database.songDao().getSong(songId).first()?.path ?: return false
-        return path.startsWith("content://") || File(path).exists()
+        return path.startsWith("content://") || withContext(Dispatchers.IO) { File(path).exists() }
     }
 }
