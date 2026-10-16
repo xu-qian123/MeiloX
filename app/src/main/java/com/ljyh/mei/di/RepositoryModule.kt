@@ -1,8 +1,12 @@
 package com.ljyh.mei.di
 
+import com.ljyh.mei.AppContext
+import com.ljyh.mei.constants.CookieKey
 import com.ljyh.mei.data.network.api.ApiService
 import com.ljyh.mei.data.network.QQMusicUApiService
+import com.ljyh.mei.data.network.NeteaseLoginSecurity
 import com.ljyh.mei.data.network.api.EApiService
+import com.ljyh.mei.data.network.api.MeloXDirectService
 import com.ljyh.mei.data.network.api.WeApiService
 import com.ljyh.mei.data.repository.HomeRepository
 import com.ljyh.mei.data.repository.PlayerRepository
@@ -12,11 +16,16 @@ import com.ljyh.mei.data.repository.ShareRepository
 import com.ljyh.mei.data.repository.UserRepository
 import com.ljyh.mei.data.repository.ArtistRepository
 import com.ljyh.mei.data.repository.CommentRepository
+import com.ljyh.mei.di.repository.LocalPlaylistRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import javax.inject.Named
+import com.ljyh.mei.utils.dataStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -31,8 +40,23 @@ object RepositoryModule {
 
     @Singleton
     @Provides
-    fun providePlaylistRepository(apiService: ApiService,weApiService: WeApiService, eApiService: EApiService): PlaylistRepository {
-        return PlaylistRepository(apiService,weApiService, eApiService)
+    fun providePlaylistRepository(
+        apiService: ApiService,
+        weApiService: WeApiService,
+        eApiService: EApiService,
+        neteaseLoginSecurity: NeteaseLoginSecurity,
+        localPlaylistRepository: LocalPlaylistRepository,
+    ): PlaylistRepository {
+        return PlaylistRepository(
+            apiService,
+            weApiService,
+            eApiService,
+            freshCheckToken = neteaseLoginSecurity::freshCheckToken,
+            subscriptionAccount = {
+                runBlocking { AppContext.instance.dataStore.data.first()[CookieKey].orEmpty() }
+            },
+            onUnsubscribed = localPlaylistRepository::deletePlaylistById,
+        )
     }
 
     @Singleton
@@ -69,8 +93,12 @@ object RepositoryModule {
 
     @Singleton
     @Provides
-    fun provideCommentRepository(apiService: ApiService, weApiService: WeApiService): CommentRepository {
-        return CommentRepository(apiService, weApiService)
+    fun provideCommentRepository(
+        apiService: ApiService,
+        weApiService: WeApiService,
+        @Named("MeloXEapi") directEapi: MeloXDirectService,
+        @Named("MeloXWeapi") directWeapi: MeloXDirectService,
+    ): CommentRepository {
+        return CommentRepository(apiService, weApiService, directEapi, directWeapi)
     }
 }
-

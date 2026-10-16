@@ -1,5 +1,7 @@
 # 同步设置读取盘点（2026-10-15，批次 E）
 
+此为合并上游 1.55.0 前的历史盘点；2026-10-16 的合并调整见 [upstream-1.55.0-merge.md](upstream-1.55.0-merge.md)。后续批次须基于合并后的调用链重新核实数量和线程。
+
 范围：`app/src/main/java` 的 DataStore 同步 getter、preference/enumPreference 委托及 runBlocking。检索包含调用表达式、工具导入、委托用法和残余 runBlocking；不能仅凭函数名含 suspend 判断内部是否阻塞。
 
 ## 本批迁移

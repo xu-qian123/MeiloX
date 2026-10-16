@@ -31,7 +31,9 @@ import com.ljyh.mei.playback.queue.Queue
 import com.ljyh.mei.utils.dataStore
 import com.ljyh.mei.utils.reportException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import androidx.datastore.preferences.core.edit
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -85,6 +87,9 @@ class PlayerConnection(
     val canSkipNext = MutableStateFlow(true)
 
     val error = MutableStateFlow<PlaybackException?>(null)
+    val availableMusicQualities = service.availableMusicQualities
+    val currentMusicQuality = service.currentMusicQuality
+    val isLoadingMusicQualities = service.isLoadingMusicQualities
 
     private var qualityChangeJob: Job? = null
     private val settingsActions = PlaybackSettingsActions(scope, service.dataStore.data) {
@@ -129,9 +134,24 @@ class PlayerConnection(
     fun fmStart(firstSongId: String? = null) {
 
         service.scope.launch {
+            service.queueTitle = "私人 FM"
+            queueTitle.value = service.queueTitle
             service.queueManager.startFmModeById(firstSongId)
         }
     }
+
+    suspend fun similarFmStart(
+        songIds: List<String>,
+        shouldPlay: () -> Boolean = { true },
+    ): Boolean = service.scope.async(Dispatchers.Main.immediate) {
+        service.queueManager.startSimilarFmMode(songIds, shouldPlay).await().also { started ->
+            if (started) {
+                service.queueTitle = SIMILAR_FM_TITLE
+                queueTitle.value = service.queueTitle
+                isFMMode.value = true
+            }
+        }
+    }.await()
 
 
     fun playQueue(queue: ListQueue, shuffle: Boolean? = null) {
@@ -156,6 +176,8 @@ class PlayerConnection(
         service.addToQueue(items)
     }
 
+    fun refreshAvailableMusicQualities() = service.refreshAvailableMusicQualities()
+
     fun changeQuality(quality: MusicQuality) {
         qualityChangeJob?.cancel()
         qualityChangeJob = scope.launch {
@@ -170,11 +192,8 @@ class PlayerConnection(
 
             // Keep the playlist intact, but force every source that may have been
             // prepared at the previous quality to be discarded.
-            service.resetPlaybackSourcesForQualityChange()
-            player.refreshMediaItemSource(index)
-            player.seekTo(index, position)
-            player.prepare()
-            player.playWhenReady = shouldPlay
+            service.resetRejectedPlaybackSources()
+            service.refreshPlaybackSource(index, position, shouldPlay)
         }
     }
 
@@ -260,6 +279,7 @@ class PlayerConnection(
     }
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+        isFMMode.value = service.isFmMode()
         queueWindows.value = player.getQueueWindows()
         queueTitle.value = service.queueTitle
         currentMediaItemIndex.value = player.currentMediaItemIndex

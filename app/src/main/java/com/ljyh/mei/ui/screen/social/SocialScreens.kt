@@ -410,7 +410,6 @@ fun ConversationScreen(userId: Long, viewModel: ConversationViewModel = hiltView
                                     color = if (outgoing || LocalGlassColors.current.isDark && !outgoing) Color.White else Color.Black,
                                     fontSize = 15.sp,
                                     lineHeight = 18.sp,
-                                    letterSpacing = 0.6.sp,
                                 ),
                                 modifier = Modifier.padding(top = if (message.payload.resource == null) 0.dp else 8.dp),
                             )
@@ -431,7 +430,7 @@ fun ConversationScreen(userId: Long, viewModel: ConversationViewModel = hiltView
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
+                    .padding(horizontal = 20.dp)
                     .padding(bottom = bottomPadding + 8.dp)
                     .onSizeChanged { composerHeight = with(density) { it.height.toDp() } },
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -537,7 +536,6 @@ private fun IosMessageBubble(
                     color = colors.secondaryContent,
                     fontSize = 10.sp,
                     lineHeight = 14.sp,
-                    letterSpacing = 1.sp,
                 ),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
@@ -550,7 +548,6 @@ private fun IosMessageBubble(
                     color = colors.secondaryContent,
                     fontSize = 10.sp,
                     lineHeight = 14.sp,
-                    letterSpacing = 1.sp,
                 ),
                 modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 4.dp),
             )

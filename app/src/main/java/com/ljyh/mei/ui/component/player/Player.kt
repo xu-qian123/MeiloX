@@ -36,14 +36,13 @@ import com.ljyh.mei.ui.component.player.state.PlayerStateContainer
 import com.ljyh.mei.ui.component.player.state.rememberPlayerStateContainer
 import com.ljyh.mei.ui.component.sheet.BottomSheetState
 import com.ljyh.mei.ui.component.utils.rememberDeviceInfo
-import com.ljyh.mei.ui.component.utils.rememberLifecycleStarted
 import com.ljyh.mei.ui.local.LocalNavController
 import com.ljyh.mei.ui.local.LocalPlayerConnection
 import com.ljyh.mei.ui.glass.LocalBlurBackdrop
 import com.ljyh.mei.ui.glass.LocalGlassBackdrop
 import com.ljyh.mei.ui.glass.LocalGroupedListBackgroundAlpha
 import com.ljyh.mei.ui.glass.SheetGroupedListBackgroundAlpha
-import com.ljyh.mei.ui.glass.rememberCrossWindowBackdrop
+import com.ljyh.mei.ui.glass.rememberRasterizedPlayerBackdrop
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.size.Precision
@@ -59,6 +58,7 @@ internal val LocalPlayerArtwork = staticCompositionLocalOf<Pair<String, androidx
 
 /** Publishes a capturable frame for the player's native GL background. */
 val LocalPlayerBackdropFrame = staticCompositionLocalOf<MutableState<ImageBitmap?>?> { null }
+internal val LocalPlayerBackgroundReadyChanged = staticCompositionLocalOf<(Boolean) -> Unit> { {} }
 
 @OptIn(UnstableApi::class)
 @RequiresApi(Build.VERSION_CODES.S)
@@ -68,6 +68,7 @@ fun BottomSheetPlayer(
     modifier: Modifier = Modifier,
     compactMiniPlayerProgress: State<Float>,
     miniPlayerVerticalOffset: () -> Dp,
+    onBackgroundReadyChanged: (Boolean) -> Unit = {},
     playerViewModel: PlayerViewModel = hiltViewModel(),
     playlistViewModel: PlaylistViewModel = hiltViewModel(),
 ) {
@@ -100,21 +101,20 @@ fun BottomSheetPlayer(
     // separate source so sheets can sample it without changing that visual z-order.
     val playerCoverBackdrop = rememberLayerBackdrop()
     val playerBackdrop = rememberCombinedBackdrop(
-        rememberCrossWindowBackdrop(playerBackgroundBackdrop),
-        rememberCrossWindowBackdrop(playerContentBackdrop),
-        rememberCrossWindowBackdrop(playerCoverBackdrop),
+        rememberRasterizedPlayerBackdrop(playerBackgroundBackdrop),
+        rememberRasterizedPlayerBackdrop(playerContentBackdrop),
+        rememberRasterizedPlayerBackdrop(playerCoverBackdrop),
     )
 
     // 获取播放器样式
     val playerStyle by rememberEnumPreference(PlayerStyleKey, defaultValue = PlayerStyle.AppleMusic)
 
     // 创建公共状态容器
-    val lifecycleStarted by rememberLifecycleStarted()
-    val sheetCollapsed by remember(state) { derivedStateOf { state.isCollapsed } }
+    val sheetExpanded by remember(state) { derivedStateOf { state.isExpanded } }
     val stateContainer = rememberPlayerStateContainer(
         playerViewModel = playerViewModel,
         playerConnection = playerConnection,
-        progressUpdatesEnabled = lifecycleStarted && !sheetCollapsed,
+        progressUpdatesEnabled = sheetExpanded,
     )
 
     // 创建弹窗处理器
@@ -144,6 +144,7 @@ fun BottomSheetPlayer(
         LocalPlayerSheet provides sheetLayers,
         LocalPlayerArtwork provides artwork,
         LocalPlayerBackdropFrame provides backdropFrame,
+        LocalPlayerBackgroundReadyChanged provides onBackgroundReadyChanged,
         LocalGlassBackdrop provides playerBackdrop,
         LocalBlurBackdrop provides playerBackdrop,
     ) {

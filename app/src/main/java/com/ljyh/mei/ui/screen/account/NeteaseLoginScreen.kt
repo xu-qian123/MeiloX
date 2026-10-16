@@ -48,11 +48,12 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import com.ljyh.mei.BuildConfig
 import com.ljyh.mei.R
-import com.ljyh.mei.constants.CookieKey
 import com.ljyh.mei.constants.UserAvatarUrlKey
 import com.ljyh.mei.constants.UserIdKey
 import com.ljyh.mei.constants.UserNicknameKey
 import com.ljyh.mei.data.repository.MeloXRepository
+import com.ljyh.mei.data.network.clearNeteaseAccountSession
+import com.ljyh.mei.data.network.setNeteaseWebSession
 import com.ljyh.mei.ui.glass.GlassButton
 import com.ljyh.mei.ui.glass.GlassEmphasis
 import com.ljyh.mei.ui.glass.GlassSurfaceStyle
@@ -65,11 +66,17 @@ import com.ljyh.mei.ui.glass.LocalGlassColors
 import com.ljyh.mei.ui.glass.SfIcon
 import com.ljyh.mei.ui.local.LocalNavController
 import com.ljyh.mei.ui.local.LocalPlayerAwareWindowInsets
+import com.ljyh.mei.ui.navigation.MeiNavigator
+import com.ljyh.mei.ui.screen.Screen
 import com.ljyh.mei.utils.dataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -77,25 +84,93 @@ import javax.inject.Inject
 @Composable
 fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
     val navController = LocalNavController.current
-    var webView by remember { mutableStateOf<WebView?>(null) }
-    var detected by remember { mutableStateOf(false) }
-    var showCookieLoginSheet by remember { mutableStateOf(false) }
-    val cookieManager = remember { CookieManager.getInstance() }
+    var showMobileLoginSheet by remember { mutableStateOf(false) }
     val bottomPadding = LocalPlayerAwareWindowInsets.current
         .asPaddingValues()
         .calculateBottomPadding()
 
+    IosPinnedListPage(
+        title = stringResource(R.string.netease_login),
+        subtitle = stringResource(R.string.netease_mobile_login_page_subtitle),
+        showsLargeTitle = false,
+        bottomPadding = bottomPadding,
+        onNavigateBack = navController::navigateUp,
+    ) {
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
+                SfIcon("iphone", null, size = 56.dp)
+                Text(
+                    text = stringResource(R.string.netease_mobile_login_page_tip),
+                    style = IosTypography.body,
+                    color = LocalGlassColors.current.secondaryContent,
+                )
+                GlassButton(
+                    onClick = { showMobileLoginSheet = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = GlassSurfaceStyle.Standard,
+                    emphasis = GlassEmphasis.Prominent,
+                ) {
+                    Text(
+                        stringResource(R.string.netease_mobile_login),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                GlassButton(
+                    onClick = { Screen.NeteaseWebLogin.navigate(navController) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style = GlassSurfaceStyle.Standard,
+                ) {
+                    SfIcon("globe", null, size = 19.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.netease_web_login),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        }
+    }
+
+    if (showMobileLoginSheet) {
+        NeteaseMobileLoginSheet(
+            onDismiss = { showMobileLoginSheet = false },
+            onSubmitPassword = viewModel::loginWithMobilePassword,
+            onRequestSmsCode = viewModel::requestMobileSmsCode,
+            onSubmitSms = viewModel::loginWithMobileSms,
+            onSubmitUpSms = viewModel::loginWithUpSms,
+            onLoginSuccess = navController::finishNeteaseLogin,
+        )
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun NeteaseWebLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
+    val navController = LocalNavController.current
+    var webView by remember { mutableStateOf<WebView?>(null) }
+    var detected by remember { mutableStateOf(false) }
+    var verificationFailed by remember { mutableStateOf(false) }
+    var attemptedCookie by remember { mutableStateOf<String?>(null) }
+    var showCookieLoginSheet by remember { mutableStateOf(false) }
+    val cookieManager = remember { CookieManager.getInstance() }
+    val bottomPadding = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
+
     LaunchedEffect(webView) {
         while (webView != null && !detected) {
-            val cookieHeader = cookieManager.getCookie("https://music.163.com").orEmpty()
-            val musicU = cookieHeader.split(';')
-                .map(String::trim)
+            val musicU = cookieManager.getCookie("https://music.163.com").orEmpty()
+                .split(';').map(String::trim)
                 .firstOrNull { it.startsWith("MUSIC_U=") }
-                ?.substringAfter('=')
-                ?.takeIf(String::isNotBlank)
-            if (musicU != null) {
-                viewModel.completeLogin(musicU)
-                detected = true
+                ?.substringAfter('=')?.takeIf(String::isNotBlank)
+            if (!showCookieLoginSheet && musicU != null && musicU != attemptedCookie) {
+                attemptedCookie = musicU
+                detected = viewModel.loginWithCookie(musicU)
+                verificationFailed = !detected
             }
             delay(500)
         }
@@ -103,9 +178,12 @@ fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
 
     Box(Modifier.fillMaxSize()) {
         IosPinnedListPage(
-            title = stringResource(R.string.netease_login),
-            subtitle = if (detected) stringResource(R.string.netease_login_detected)
-            else stringResource(R.string.netease_login_waiting),
+            title = stringResource(R.string.netease_web_login),
+            subtitle = stringResource(when {
+                detected -> R.string.netease_login_detected
+                verificationFailed -> R.string.netease_cookie_login_verification_failed
+                else -> R.string.netease_login_waiting
+            }),
             showsLargeTitle = false,
             horizontalContentPadding = 0.dp,
             bottomPadding = bottomPadding,
@@ -113,12 +191,9 @@ fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
             actions = {
                 if (detected) {
                     GlassButton(
-                        onClick = navController::navigateUp,
-                        style = GlassSurfaceStyle.Standard,
+                        onClick = navController::finishNeteaseLogin,
                         emphasis = GlassEmphasis.Prominent,
-                    ) {
-                        Text(stringResource(R.string.done))
-                    }
+                    ) { Text(stringResource(R.string.done)) }
                 }
             },
         ) {
@@ -130,7 +205,7 @@ fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
                             setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
-                            settings.userAgentString = settings.userAgentString + " Mei/1.0"
+                            settings.userAgentString += " Mei/1.0"
                             cookieManager.setAcceptCookie(true)
                             cookieManager.setAcceptThirdPartyCookies(this, true)
                             webViewClient = WebViewClient()
@@ -142,7 +217,6 @@ fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
                 )
             }
         }
-
         if (!detected && !showCookieLoginSheet) {
             GlassButton(
                 onClick = { showCookieLoginSheet = true },
@@ -165,18 +239,16 @@ fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
             }
         }
     }
-
     if (showCookieLoginSheet) {
         NeteaseCookieLoginSheet(
             onDismiss = { showCookieLoginSheet = false },
             onSubmit = viewModel::loginWithCookie,
             onLoginSuccess = {
                 showCookieLoginSheet = false
-                detected = true
+                navController.finishNeteaseLogin()
             },
         )
     }
-
     DisposableEffect(Unit) {
         onDispose {
             webView?.apply {
@@ -187,6 +259,11 @@ fun NeteaseLoginScreen(viewModel: NeteaseLoginViewModel = hiltViewModel()) {
             webView = null
         }
     }
+}
+
+internal fun MeiNavigator.finishNeteaseLogin() {
+    // A successful login leaves both the entry page and its WebView child behind.
+    navigateTopLevel(Screen.Home.route)
 }
 
 @Composable
@@ -351,42 +428,44 @@ class NeteaseLoginViewModel @Inject constructor(
     @ApplicationContext private val context: android.content.Context,
     private val repository: MeloXRepository,
 ) : ViewModel() {
-    suspend fun completeLogin(musicU: String) {
-        context.dataStore.edit { it[CookieKey] = musicU }
-        runCatching { repository.accountProfile() }.getOrNull()?.let { profile ->
-            context.dataStore.edit { preferences ->
-                preferences[UserIdKey] = profile.id.toString()
-                preferences[UserNicknameKey] = profile.nickname
-                profile.avatarUrl?.let { preferences[UserAvatarUrlKey] = it }
-            }
-        }
+    suspend fun loginWithMobilePassword(
+        phone: String,
+        countryCode: String,
+        password: String,
+    ) {
+        repository.loginWithMobilePassword(phone, countryCode, password)
+    }
+
+    suspend fun requestMobileSmsCode(
+        activity: android.app.Activity,
+        phone: String,
+        countryCode: String,
+    ) {
+        repository.requestMobileSmsCode(activity, phone, countryCode)
+    }
+
+    suspend fun loginWithMobileSms(
+        phone: String,
+        countryCode: String,
+        code: String,
+    ) {
+        repository.loginWithMobileSms(phone, countryCode, code)
+    }
+
+    suspend fun loginWithUpSms(challenge: com.ljyh.mei.data.network.NeteaseUrsUpSmsChallenge) {
+        repository.loginWithUpSms(challenge)
     }
 
     suspend fun loginWithCookie(musicU: String): Boolean {
-        val previousPreferences = context.dataStore.data.first()
-        val previousCookie = previousPreferences[CookieKey]
-        val previousUserId = previousPreferences[UserIdKey]
-        val previousNickname = previousPreferences[UserNicknameKey]
-        val previousAvatarUrl = previousPreferences[UserAvatarUrlKey]
-
-        context.dataStore.edit { it[CookieKey] = musicU }
-        val profile = runCatching { repository.accountProfile() }.getOrNull()
-        if (profile == null) {
-            context.dataStore.edit { preferences ->
-                if (previousCookie == null) preferences.remove(CookieKey)
-                else preferences[CookieKey] = previousCookie
-                if (previousUserId == null) preferences.remove(UserIdKey)
-                else preferences[UserIdKey] = previousUserId
-                if (previousNickname == null) preferences.remove(UserNicknameKey)
-                else preferences[UserNicknameKey] = previousNickname
-                if (previousAvatarUrl == null) preferences.remove(UserAvatarUrlKey)
-                else preferences[UserAvatarUrlKey] = previousAvatarUrl
-            }
+        val profile = try {
+            repository.accountProfile(webCookie = musicU)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
             return false
         }
-
         context.dataStore.edit { preferences ->
-            preferences[CookieKey] = musicU
+            preferences.setNeteaseWebSession(musicU)
             preferences[UserIdKey] = profile.id.toString()
             preferences[UserNicknameKey] = profile.nickname
             if (profile.avatarUrl == null) preferences.remove(UserAvatarUrlKey)
@@ -396,15 +475,13 @@ class NeteaseLoginViewModel @Inject constructor(
     }
 }
 
-fun logoutNetease(context: android.content.Context) {
-    CookieManager.getInstance().removeAllCookies {
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            context.dataStore.edit { preferences ->
-                preferences.remove(CookieKey)
-                preferences.remove(UserIdKey)
-                preferences.remove(UserNicknameKey)
-                preferences.remove(UserAvatarUrlKey)
+suspend fun logoutNetease(context: android.content.Context) {
+    withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine { continuation ->
+            CookieManager.getInstance().removeAllCookies {
+                if (continuation.isActive) continuation.resume(Unit)
             }
         }
     }
+    context.dataStore.edit { it.clearNeteaseAccountSession() }
 }

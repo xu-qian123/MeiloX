@@ -1,126 +1,139 @@
 package com.ljyh.mei.data.repository
 
-import android.content.Context
-import android.util.Log
-import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.Preferences
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonParseException
+import com.google.gson.annotations.SerializedName
 import com.ljyh.mei.AppContext
-import com.ljyh.mei.constants.LastHomePageData_1
-import com.ljyh.mei.constants.LastHomePageData_2
-import com.ljyh.mei.constants.LastHomePageTime
+import com.ljyh.mei.constants.UserIdKey
 import com.ljyh.mei.constants.AndroidIdKey
-import com.ljyh.mei.data.model.eapi.HomePageResourceShow
-import com.ljyh.mei.data.model.api.GetSearch
-import com.ljyh.mei.data.model.api.SearchResult
-import com.ljyh.mei.data.model.weapi.GetHomePageResourceShow
+import com.ljyh.mei.utils.netease.NeteaseUtils.getAndroidId
+import com.ljyh.mei.data.model.eapi.HomePageResourceShow.Data.Block
 import com.ljyh.mei.data.model.weapi.buildGetHomePageResourceShow
+import com.ljyh.mei.data.network.NeteaseSessionType
 import com.ljyh.mei.data.network.Resource
 import com.ljyh.mei.data.network.api.ApiService
 import com.ljyh.mei.data.network.api.EApiService
-import com.ljyh.mei.data.network.api.WeApiService
+import com.ljyh.mei.data.network.neteaseSessionType
 import com.ljyh.mei.data.network.safeApiCall
-import com.ljyh.mei.utils.cache.CacheFile
-import com.ljyh.mei.utils.cache.CacheFile.isNewDay
 import com.ljyh.mei.utils.dataStore
-import com.ljyh.mei.utils.netease.NeteaseUtils.getAndroidId
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
-import timber.log.Timber
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
-class HomeRepository(private val eApiService: EApiService, private val apiService: ApiService) {
+internal data class HomePageOwner(
+    @SerializedName("userId") val userId: String,
+    @SerializedName("sessionType") val sessionType: NeteaseSessionType,
+)
 
-    val context = AppContext.instance
-    suspend fun getHomePageResourceShow(
-        refresh: Boolean = false
-    ): Resource<List<HomePageResourceShow.Data.Block>> {
-        Timber.tag("NewDay").d(isNewDay(getLastFetchTime(context)).toString())
-        Timber.tag("refresh").d(refresh.toString())
-        if (isNewDay(getLastFetchTime(context)) || refresh) {
-            Timber.tag("getHomePageResourceShow").d("新加载")
-            val page1 =
-                eApiService.getHomePageResourceShow(
-                    buildGetHomePageResourceShow(
-                        refresh = refresh.toString(),
-                        androidId = context.dataStore.data.first()[AndroidIdKey] ?: getAndroidId(),
-                    )
-                )
-//            val page2 = eApiService.getHomePageResourceShow(
-//                buildGetHomePageResourceShow(refresh = refresh.toString())
-//            )
-            saveLastHomePage(context, 1, page1.data.blocks)
-//            saveLastHomePage(context, 2, page2.data.blocks)
+internal fun Preferences.homePageOwner(): HomePageOwner {
+    val type = neteaseSessionType()
+    return HomePageOwner(if (type == NeteaseSessionType.None) "" else this[UserIdKey].orEmpty(), type)
+}
 
-            Timber.tag("getHomePageResourceShow").d("更新缓存")
-            return withContext(Dispatchers.IO) {
-                safeApiCall {
-                    page1.data.blocks
-//                    page1.data.blocks + page2.data.blocks
-                }
-            }
-        } else {
-            Timber.tag("getHomePageResourceShow").d("加载缓存")
-            val page1 = getLastHomePage(context, 1)
-//            val page2 = getLastHomePage(context, 2)
-            return Resource.Success(page1)
+class HomeRepository internal constructor(
+    private val cacheFile: File,
+    preferences: Flow<Preferences>,
+    private val fetch: suspend (Boolean) -> List<Block>,
+    private val now: () -> Long = System::currentTimeMillis,
+) {
+    constructor(
+        eApiService: EApiService,
+        @Suppress("UNUSED_PARAMETER") apiService: ApiService,
+    ) : this(
+        cacheFile = File(AppContext.instance.filesDir, "home_page_data_1.json"),
+        preferences = AppContext.instance.dataStore.data,
+        fetch = { refresh ->
+            loadHomePageBlocks(
+                buildGetHomePageResourceShow(refresh = refresh.toString(), androidId = AppContext.instance.dataStore.data.first()[AndroidIdKey] ?: getAndroidId()),
+                eApiService::getHomePageResourceShow,
+            )
+        },
+    )
+
+    private data class CachedHomePage(
+        @SerializedName("version") val version: Int,
+        @SerializedName("owner") val owner: HomePageOwner?,
+        @SerializedName("fetchedAt") val fetchedAt: Long,
+        @SerializedName("blocks") val blocks: List<Block?>?,
+    )
+
+    internal val owners: Flow<HomePageOwner> = preferences.map { it.homePageOwner() }.distinctUntilChanged()
+    private val gson = Gson()
+    private val cacheMutex = Mutex()
+
+    suspend fun getHomePageResourceShow(refresh: Boolean = false): Resource<List<Block>> =
+        getHomePageResourceShow(refresh, owners.first())
+
+    internal suspend fun getHomePageResourceShow(
+        refresh: Boolean,
+        owner: HomePageOwner,
+    ): Resource<List<Block>> = withContext(Dispatchers.IO) {
+        safeApiCall {
+            requireOwner(owner)
+            val cached = if (refresh) null else cacheMutex.withLock { readCache(owner) }
+            val blocks = cached ?: fetch(refresh).also { writeCache(owner, it) }
+            requireOwner(owner)
+            blocks
         }
     }
 
+    private fun readCache(owner: HomePageOwner): List<Block>? = try {
+        if (!cacheFile.isFile) null else {
+            val page = gson.fromJson(cacheFile.readText(), CachedHomePage::class.java)
+            val current = now()
+            val localNow = Instant.ofEpochMilli(current).atZone(HOME_CACHE_ZONE)
+            val todayBoundary = localNow.toLocalDate().atTime(LocalTime.of(6, 0)).atZone(HOME_CACHE_ZONE)
+            val boundary = (if (localNow < todayBoundary) todayBoundary.minusDays(1) else todayBoundary)
+                .toInstant().toEpochMilli()
+            page?.takeIf {
+                it.version == HOME_CACHE_VERSION && it.owner == owner && it.fetchedAt in boundary..current
+            }?.blocks?.takeIf { blocks -> blocks.none { it?.positionCode.isNullOrBlank() } }?.filterNotNull()
+        }
+    } catch (_: IOException) {
+        null
+    } catch (_: JsonParseException) {
+        null
+    }
 
-    private suspend fun saveLastHomePage(
-        context: Context,
-        page: Int,
-        newData: List<HomePageResourceShow.Data.Block>
-    ) {
-        withContext(Dispatchers.IO) {
-            val file = getFileForPage(context, page)
-            val json = Gson().toJson(newData)
-            file.writeText(json)
-            context.dataStore.edit {
-                it[LastHomePageTime] = System.currentTimeMillis()
-            }
+    private suspend fun writeCache(owner: HomePageOwner, blocks: List<Block>) = cacheMutex.withLock {
+        requireOwner(owner)
+        val temporary = File.createTempFile("home_page_", ".tmp", cacheFile.parentFile)
+        try {
+            temporary.writeText(gson.toJson(CachedHomePage(HOME_CACHE_VERSION, owner, now(), blocks)))
+            // Keep the previous complete feed until every page and the replacement are ready.
+            requireOwner(owner)
+            Files.move(
+                temporary.toPath(), cacheFile.toPath(),
+                StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING,
+            )
+        } finally {
+            temporary.delete()
         }
     }
 
-    private suspend fun getLastHomePage(
-        context: Context,
-        page: Int
-    ): List<HomePageResourceShow.Data.Block> {
-        return withContext(Dispatchers.IO) {
-            val file = getFileForPage(context, page)
-            if (file.exists()) {
-                try {
-                    val json = file.readText()
-                    if (json.isBlank()) {
-                        return@withContext emptyList()
-                    }
-                    val gson = Gson()
-                    gson.fromJson(
-                        json,
-                        object : TypeToken<List<HomePageResourceShow.Data.Block>>() {}.type
-                    )
-                } catch (e: Exception) {
-                    // 捕获 JSON 语法错误 (JsonSyntaxException)、IO读取错误等所有异常
-                    e.printStackTrace() // 打印错误日志方便调试，不需要的话可以删掉这行
-                    emptyList()
-                }
-            } else {
-                emptyList()
-            }
-        }
+    private suspend fun requireOwner(owner: HomePageOwner) {
+        currentCoroutineContext().ensureActive()
+        if (owners.first() != owner) throw CancellationException("Home account changed")
     }
 
-
-
-    private fun getFileForPage(context: Context, page: Int): File {
-        return File(context.filesDir, "home_page_data_$page.json")
-    }
-
-    private suspend fun getLastFetchTime(context: Context): Long {
-        val preferences = context.dataStore.data.first()
-        Timber.tag("getLastFetchTime").d((preferences[LastHomePageTime] ?: 0L).toString())
-        return preferences[LastHomePageTime] ?: 0L
+    private companion object {
+        const val HOME_CACHE_VERSION = 2
+        val HOME_CACHE_ZONE: ZoneId = ZoneId.of("Asia/Shanghai")
     }
 }

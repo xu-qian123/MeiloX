@@ -20,6 +20,8 @@ internal fun MediaMetadata.toSystemLyricSong(data: LyricData?, offsetMs: Long = 
     // so consumers highlighting at the real playback position match the UI.
     val shift = -offsetMs
     val richLines = lines.mapIndexedNotNull { index, line ->
+        // Expired negative-time credits must not expand into song-long overlapping lines.
+        if (line.start < 0 && line.end <= 0) return@mapIndexedNotNull null
         val karaoke = line as? KaraokeLine
         val plain = line as? SyncedLine
         val text = karaoke?.syllables?.joinToString("") { it.content } ?: plain?.content

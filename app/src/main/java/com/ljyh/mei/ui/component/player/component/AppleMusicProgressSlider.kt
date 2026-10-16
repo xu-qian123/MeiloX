@@ -33,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -216,8 +217,10 @@ fun AppleMusicProgressSlider(
     onSeekPreviewMove: ((Long) -> Unit)? = null,
     onSeekPreviewEnd: ((Long?) -> Unit)? = null,
 ) {
-    val musicQuality by rememberEnumPreference(MusicQualityKey, MusicQuality.EXHIGH)
     val playerConnection = LocalPlayerConnection.current
+    val musicQuality = playerConnection?.currentMusicQuality?.collectAsStateWithLifecycle()?.value
+    val availableQualities = playerConnection?.availableMusicQualities?.collectAsStateWithLifecycle()?.value.orEmpty()
+    val qualitiesLoading = playerConnection?.isLoadingMusicQualities?.collectAsStateWithLifecycle()?.value == true
     val hapticFeedback = LocalHapticFeedback.current
 
     val isDurationValid = duration > 0
@@ -507,6 +510,9 @@ fun AppleMusicProgressSlider(
 
             PlayerQualityDropdown(
                 quality = musicQuality,
+                availableQualities = availableQualities,
+                isLoading = qualitiesLoading,
+                onMenuOpened = { playerConnection?.refreshAvailableMusicQualities() },
                 onQualitySelected = { playerConnection?.changeQuality(it) },
                 style = timeTextStyle.copy(fontSize = 10.sp),
                 color = Color.White.copy(alpha = 0.6f),

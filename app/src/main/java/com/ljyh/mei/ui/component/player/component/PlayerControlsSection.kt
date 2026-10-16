@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,8 +26,8 @@ import com.ljyh.mei.utils.rememberEnumPreference
 @OptIn(UnstableApi::class)
 @Composable
 fun PlayerControlsSection(
-    sliderPosition: Float,
-    duration: Long,
+    position: () -> Long,
+    duration: () -> Long,
     isPlaying: Boolean,
     playbackState: Int,
     playerConnection: PlayerConnection,
@@ -46,40 +46,15 @@ fun PlayerControlsSection(
     // 紧凑模式下间距减半
     val spacerHeight = if (isCompact) 8.dp else 24.dp
 
-    val (progressBarStyle, _) = rememberEnumPreference(
-        key = ProgressBarStyleKey,
-        defaultValue = ProgressBarStyle.LINEAR
-    )
-
-    val isFM = playerConnection.isFMMode.collectAsState()
+    val isFM = playerConnection.isFMMode.collectAsStateWithLifecycle()
 
     Column(
         modifier = Modifier.fillMaxWidth()
     ) {
-        AppleMusicProgressSlider(
-            position = sliderPosition.toLong(),
-            duration = duration,
-            isPlaying = isPlaying,
-            onPositionChange = { newPosition ->
-                playerConnection.player.seekTo(newPosition)
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = PlayerHorizontalPadding + 8.dp),
-            trackStyle = if (progressBarStyle == ProgressBarStyle.LINEAR) {
-                AppleMusicSliderTrackStyle.Solid
-            } else {
-                AppleMusicSliderTrackStyle.Wave
-            },
-            isPlaybackWaiting = playbackState == Player.STATE_BUFFERING,
-            playbackSpeed = playerConnection.player.playbackParameters.speed,
-            playbackSessionKey = playerConnection.player.currentMediaItem?.mediaId,
-            previewPositionMs = previewPositionMs,
-            onSeekPreviewStart = onSeekPreviewStart,
-            onSeekPreviewMove = onSeekPreviewMove,
-            onSeekPreviewEnd = onSeekPreviewEnd,
+        PlayerProgressSection(
+            position, duration, isPlaying, playbackState, playerConnection,
+            previewPositionMs, onSeekPreviewStart, onSeekPreviewMove, onSeekPreviewEnd,
         )
-
 
         Spacer(Modifier.height(spacerHeight))
 
@@ -117,4 +92,45 @@ fun PlayerControlsSection(
             Spacer(Modifier.height(16.dp))
         }
     }
+}
+
+@OptIn(UnstableApi::class)
+@Composable
+private fun PlayerProgressSection(
+    position: () -> Long,
+    duration: () -> Long,
+    isPlaying: Boolean,
+    playbackState: Int,
+    playerConnection: PlayerConnection,
+    previewPositionMs: Long?,
+    onSeekPreviewStart: ((Long) -> Unit)?,
+    onSeekPreviewMove: ((Long) -> Unit)?,
+    onSeekPreviewEnd: ((Long?) -> Unit)?,
+) {
+    // Keep ticking position reads inside the progress subtree.
+    val progressBarStyle = rememberEnumPreference(ProgressBarStyleKey, ProgressBarStyle.LINEAR).value
+    AppleMusicProgressSlider(
+        position = previewPositionMs ?: position(),
+        duration = duration(),
+        isPlaying = isPlaying,
+        onPositionChange = { newPosition ->
+            playerConnection.player.seekTo(newPosition)
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = PlayerHorizontalPadding + 8.dp),
+        trackStyle = if (progressBarStyle == ProgressBarStyle.LINEAR) {
+            AppleMusicSliderTrackStyle.Solid
+        } else {
+            AppleMusicSliderTrackStyle.Wave
+        },
+        isPlaybackWaiting = playbackState == Player.STATE_BUFFERING,
+        playbackSpeed = playerConnection.player.playbackParameters.speed,
+        playbackSessionKey = playerConnection.player.currentMediaItem?.mediaId,
+        previewPositionMs = previewPositionMs,
+        onSeekPreviewStart = onSeekPreviewStart,
+        onSeekPreviewMove = onSeekPreviewMove,
+        onSeekPreviewEnd = onSeekPreviewEnd,
+    )
+
 }

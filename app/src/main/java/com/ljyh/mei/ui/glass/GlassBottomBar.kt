@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
@@ -58,6 +60,7 @@ import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.emptyBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -99,10 +102,13 @@ private val LocalLiquidTabScale = staticCompositionLocalOf { { 1f } }
 val CompactBottomControlIconSize = 22.dp
 
 private val ExpandedNavigationIconSize = 28.dp
-private val NavigationLabelStyle = IosTypography.caption.copy(
-    fontSize = 10.sp,
-    lineHeight = 13.sp,
-)
+private val NavigationLabelStyle: TextStyle
+    @Composable
+    @ReadOnlyComposable
+    get() = IosTypography.caption.copy(
+        fontSize = 10.sp,
+        lineHeight = 13.sp,
+    )
 private const val CompactIndicatorFadeStart = 0.74f
 private const val CompactIndicatorFadeEnd = 0.98f
 private const val CompactTabContentScaleFloor = 0.82f
@@ -164,6 +170,7 @@ fun <T> GlassBottomBar(
     val selectedIndex = tabItems.indexOfFirst { it.key == selectedKey }.takeIf { it >= 0 } ?: 0
     val selectedItem = tabItems[selectedIndex]
     val colors = LocalGlassColors.current
+    val appearance = LocalGlassAppearance.current
     val isLight = !colors.isDark
     val containerColor = colors.container
     val tabsBackdrop = rememberLayerBackdrop()
@@ -382,6 +389,7 @@ fun <T> GlassBottomBar(
             containerColor,
             pressProgressState,
             pressLayerBlock,
+            appearance,
         ) {
             Modifier.navigationGlassBackground(
                 backdrop = backdrop,
@@ -389,6 +397,7 @@ fun <T> GlassBottomBar(
                 containerColor = containerColor,
                 pressProgressState = pressProgressState,
                 layerBlock = pressLayerBlock,
+                appearance = appearance,
             )
         }
         val hiddenLayerBackdropModifier = remember(tabsBackdrop) {
@@ -396,7 +405,7 @@ fun <T> GlassBottomBar(
         }
         val morphingHiddenGlass = rememberMorphingNavigationGlass(
             backdrop = backdrop,
-            active = morphing,
+            active = morphing && appearance.usesRefraction,
             shape = Capsule(),
             tint = containerColor,
             pressProgress = { pressProgressState.value },
@@ -511,20 +520,23 @@ fun <T> GlassBottomBar(
                 containerColor,
                 isLight,
                 indicatorBackdropLayerBlock,
+                appearance,
             ) {
                 Modifier
                     .drawBackdrop(
-                        backdrop = indicatorBackdrop,
+                        backdrop = if (appearance.usesRefraction) indicatorBackdrop else emptyBackdrop(),
                         shape = { Capsule() },
                         effects = {
                             val press = pressProgressState.value
                             val opticalIntensity = press * expandedIndicatorVisibilityState.value
-                            lens(
-                                14.dp.toPx() * opticalIntensity,
-                                22.dp.toPx() * opticalIntensity,
-                                depthEffect = opticalIntensity > 0.01f,
-                                chromaticAberration = true,
-                            )
+                            if (appearance.usesRefraction) {
+                                lens(
+                                    14.dp.toPx() * opticalIntensity,
+                                    22.dp.toPx() * opticalIntensity,
+                                    depthEffect = opticalIntensity > 0.01f,
+                                    chromaticAberration = true,
+                                )
+                            }
                         },
                         highlight = {
                             Highlight.Default.copy(
@@ -560,7 +572,8 @@ fun <T> GlassBottomBar(
                             )
                             drawRect(
                                 indicatorColor,
-                                alpha = (1f - press) * (1f - compactState.value),
+                                alpha = (if (appearance.usesRefraction) 1f - press else 1f) *
+                                    (1f - compactState.value),
                             )
                             drawRect(
                                 Color.Black.copy(
@@ -622,7 +635,7 @@ fun <T> GlassBottomBar(
             }
         }
 
-        if (!indicatorSettled) {
+        if (!indicatorSettled && appearance.usesRefraction) {
             CompositionLocalProvider(LocalLiquidTabScale provides lensSourceTabContentScale) {
                 Row(
                     modifier = Modifier

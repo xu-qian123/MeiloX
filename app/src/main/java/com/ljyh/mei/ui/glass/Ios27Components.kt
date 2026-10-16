@@ -95,6 +95,7 @@ import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.backdrops.emptyBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -409,11 +410,12 @@ fun IosBottomSearchToolbar(
     onQueryChange: (TextFieldValue) -> Unit,
     onSearch: (String) -> Unit,
     onCancel: () -> Unit,
-    @Suppress("UNUSED_PARAMETER") cancelLabel: String,
+    cancelLabel: String,
     placeholder: String,
     modifier: Modifier = Modifier,
     style: GlassSurfaceStyle = GlassSurfaceStyle.Navigation,
     focusRequester: FocusRequester = remember { FocusRequester() },
+    autoFocus: Boolean = true,
 ) {
     val colors = LocalGlassColors.current
     val backdrop = LocalGlassBackdrop.current
@@ -466,10 +468,12 @@ fun IosBottomSearchToolbar(
             style = style,
             modifier = Modifier.size(56.dp),
         ) {
-            SfIcon("xmark", null, size = 20.dp, tint = colors.content)
+            SfIcon("xmark", cancelLabel, size = 20.dp, tint = colors.content)
         }
     }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(autoFocus) {
+        if (autoFocus) focusRequester.requestFocus()
+    }
 }
 
 /** Figma node 5661:33949: 52dp table text field with iOS separators. */
@@ -674,6 +678,7 @@ fun IosContextMenu(
     menuAlpha: Float = animationProgress,
     contentAlpha: Float = animationProgress,
     shadowAlpha: Float = animationProgress,
+    highlightAlpha: Float? = null,
     opensAbove: Boolean = false,
     itemCount: Int = 1,
     compact: Boolean = false,
@@ -705,10 +710,15 @@ fun IosContextMenu(
         pivotFractionY = startOrigin.pivotFractionY +
             (0.5f - startOrigin.pivotFractionY) * originProgress,
     )
+    val appearance = LocalGlassAppearance.current
     val childBackdrop = rememberLayerBackdrop()
     // Context menus render in a separate Popup window. Map their sampling coordinates back
     // to the source window so the menu refracts the content physically behind its position.
-    val samplingBackdrop = rememberCrossWindowBackdrop(backdrop)
+    val samplingBackdrop = if (appearance.usesBackdrop) {
+        rememberCrossWindowBackdrop(backdrop)
+    } else {
+        emptyBackdrop()
+    }
     val isLight = !LocalGlassColors.current.isDark
     val elevatedBackground = LocalGlassColors.current.elevatedBackground
     val menuLayerBlock: GraphicsLayerScope.() -> Unit = {
@@ -797,13 +807,18 @@ fun IosContextMenu(
                         .fillMaxSize()
                         .drawBackdrop(
                             backdrop = samplingBackdrop,
-                            exportedBackdrop = childBackdrop,
+                            exportedBackdrop = childBackdrop.takeIf { appearance.usesBackdrop },
                             shape = { RoundedRectangle(radius) },
                             effects = {
-                                blur(if (isLight) 16.dp.toPx() else 12.dp.toPx())
+                                if (appearance.usesBackdrop) {
+                                    blur(if (isLight) 16.dp.toPx() else 12.dp.toPx())
+                                }
                             },
                             highlight = {
-                                Highlight.Default.copy(alpha = progress * (0.46f + 0.18f * pulse))
+                                Highlight.Default.copy(
+                                    alpha = highlightAlpha?.coerceIn(0f, 1f)
+                                        ?: progress * (0.46f + 0.18f * pulse),
+                                )
                             },
                             shadow = {
                                 Shadow(
@@ -817,7 +832,11 @@ fun IosContextMenu(
                             innerShadow = { InnerShadow(radius = 8.dp, alpha = 0.10f * progress) },
                             layerBlock = menuLayerBlock,
                             onDrawSurface = {
-                                drawRect(elevatedBackground.copy(alpha = 0.70f * progress))
+                                drawRect(
+                                    elevatedBackground.copy(
+                                        alpha = if (appearance.usesBackdrop) 0.70f * progress else 1f,
+                                    ),
+                                )
                             },
                         )
                         .then(interactiveHighlight.modifier)
@@ -850,6 +869,7 @@ fun IosPopupMenu(
     backdrop: Backdrop = LocalBlurBackdrop.current,
     keepAnchorVisible: Boolean = false,
     forceBelowAnchor: Boolean = false,
+    fullScreen: Boolean = false,
     externalAnchorBounds: androidx.compose.ui.geometry.Rect? = null,
     menuWidth: androidx.compose.ui.unit.Dp = PopupMenuWidth,
     menuScale: Float = 1f,
@@ -1048,21 +1068,36 @@ fun IosPopupMenu(
                     opensAbove = resolved
                 }
             }
-            Popup(
-                popupPositionProvider = if (externalAnchorBounds == null) positionProvider else
-                    object : PopupPositionProvider {
-                        override fun calculatePosition(
-                            anchorBounds: IntRect,
-                            windowSize: IntSize,
-                            layoutDirection: LayoutDirection,
-                            popupContentSize: IntSize,
-                        ): IntOffset = positionProvider.calculatePosition(
-                            IntRect(
-                                externalAnchorBounds.left.toInt(), externalAnchorBounds.top.toInt(),
-                                externalAnchorBounds.right.toInt(), externalAnchorBounds.bottom.toInt(),
-                            ), windowSize, layoutDirection, popupContentSize,
+            var fullScreenMenuOffset by remember(positionProvider, externalAnchorBounds, fullScreen) {
+                mutableStateOf<IntOffset?>(null)
+            }
+            val popupPositionProvider = remember(positionProvider, externalAnchorBounds, fullScreen) {
+                object : PopupPositionProvider {
+                    override fun calculatePosition(
+                        anchorBounds: IntRect,
+                        windowSize: IntSize,
+                        layoutDirection: LayoutDirection,
+                        popupContentSize: IntSize,
+                    ): IntOffset {
+                        val menuOffset = positionProvider.calculatePosition(
+                            externalAnchorBounds?.let {
+                                IntRect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt())
+                            } ?: anchorBounds,
+                            windowSize,
+                            layoutDirection,
+                            popupContentSize,
                         )
-                    },
+                        return if (fullScreen) {
+                            fullScreenMenuOffset = menuOffset
+                            IntOffset.Zero
+                        } else {
+                            menuOffset
+                        }
+                    }
+                }
+            }
+            Popup(
+                popupPositionProvider = popupPositionProvider,
                 onDismissRequest = { onExpandedChange(false) },
                 properties = PopupProperties(
                     focusable = expanded,
@@ -1074,14 +1109,25 @@ fun IosPopupMenu(
                 // The overshoot margin is invisible window area; treat taps there like
                 // outside taps (dismiss) instead of letting them vanish into the window.
                 Box(
-                    Modifier.clickable(
-                        interactionSource = null,
-                        indication = null,
-                    ) { onExpandedChange(false) },
+                    Modifier
+                        .then(if (fullScreen) Modifier.fillMaxSize() else Modifier)
+                        .clickable(
+                            interactionSource = null,
+                            indication = null,
+                        ) { onExpandedChange(false) },
                 ) {
                     CompositionLocalProvider(LocalIosPopupMenuInteractive provides expanded) {
+                        // Wide cascading menus exceed the platform Popup's measured width.
+                        // Keep their window at screen size and position the existing animation
+                        // shell inside it so its right-hand shadow is not cut off by the window.
+                        if (fullScreen && fullScreenMenuOffset == null) return@CompositionLocalProvider
                         IosContextMenu(
                             visible = true,
+                            modifier = if (fullScreen) {
+                                Modifier.offset { fullScreenMenuOffset ?: IntOffset.Zero }
+                            } else {
+                                Modifier
+                            },
                             backdrop = backdrop,
                             animationProgress = progress.value,
                             animationVelocity = progress.velocity,
@@ -1345,6 +1391,7 @@ fun IosAlertSurface(
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
     val colors = LocalGlassColors.current
+    val appearance = LocalGlassAppearance.current
     val light = !colors.isDark
     val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
     SideEffect {
@@ -1354,7 +1401,11 @@ fun IosAlertSurface(
     val interactiveHighlight = remember(animationScope) {
         InteractiveHighlight(animationScope = animationScope)
     }
-    val samplingBackdrop = rememberCrossWindowBackdrop(backdrop)
+    val samplingBackdrop = if (appearance.usesBackdrop) {
+        rememberCrossWindowBackdrop(backdrop)
+    } else {
+        emptyBackdrop()
+    }
     val alertShape = ContinuousRoundedRectangle(34.dp)
     val alertBackgroundAlpha = if (light) 0.72f else 0.64f
     val alertLayerBlock: GraphicsLayerScope.() -> Unit = {
@@ -1377,14 +1428,16 @@ fun IosAlertSurface(
                     backdrop = samplingBackdrop,
                     shape = { alertShape },
                     effects = {
-                        blur(if (light) 16.dp.toPx() else 8.dp.toPx())
+                        if (appearance.usesBackdrop) {
+                            blur(if (light) 16.dp.toPx() else 8.dp.toPx())
+                        }
                     },
                     highlight = { Highlight.Plain },
                     layerBlock = alertLayerBlock,
                     onDrawSurface = {
-                        // Keep the Figma background-blend stack over the sampled screen;
-                        // do not add an opaque elevated surface on top of the backdrop.
-                        if (light) {
+                        if (!appearance.usesBackdrop) {
+                            drawRect(colors.container.copy(alpha = 1f))
+                        } else if (light) {
                             drawRect(
                                 Color.White.copy(alpha = 0.70f * alertBackgroundAlpha),
                                 blendMode = BlendMode.Lighten,
@@ -1630,6 +1683,7 @@ fun IosSheetSurface(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val colors = LocalGlassColors.current
+    val appearance = LocalGlassAppearance.current
     val isLight = !colors.isDark
     val animationScope = rememberCoroutineScope()
     val activeInteractiveHighlight = interactiveHighlight ?: remember(animationScope) {
@@ -1648,7 +1702,12 @@ fun IosSheetSurface(
     // Sheet surfaces render inside dialog windows (ModalBottomSheet); the shared backdrop
     // lives in the app window, so sample it with window-space coordinates. The library's
     // localPositionOf mapping cannot cross compose owners and silently sampled nothing.
-    val samplingBackdrop = rememberCrossWindowBackdrop(backdrop)
+    val backdropRenderer = if (appearance.usesBackdrop) {
+        val samplingBackdrop = rememberCrossWindowBackdrop(backdrop)
+        rememberSheetBackdropRenderer(samplingBackdrop, if (isLight) 16.dp else 12.dp)
+    } else {
+        emptyBackdrop()
+    }
     Box(
         modifier
             .fillMaxWidth()
@@ -1658,20 +1717,22 @@ fun IosSheetSurface(
                     layerBlock = sheetLayerBlock,
                 )
                 .drawBackdrop(
-                    backdrop = samplingBackdrop,
+                    backdrop = backdropRenderer,
                     shape = { shape },
-                    effects = {
-                        blur(if (isLight) 16.dp.toPx() else 12.dp.toPx())
-                    },
+                    effects = {},
                     highlight = { Highlight.Default.copy(alpha = if (isLight) 0.58f else 0.38f) },
                     shadow = { Shadow(radius = 48.dp, alpha = 0.25f) },
                     innerShadow = { InnerShadow(radius = 8.dp, alpha = 0.12f) },
                     layerBlock = sheetLayerBlock,
                     onDrawSurface = {
                         drawRect(
-                            colors.elevatedBackground.copy(alpha = if (isLight) 0.72f else 0.54f),
+                            colors.elevatedBackground.copy(
+                                alpha = if (!appearance.usesBackdrop) 1f else if (isLight) 0.72f else 0.54f,
+                            ),
                         )
-                        drawRect(Color.White.copy(alpha = if (isLight) 0.12f else 0.04f))
+                        if (appearance.usesBackdrop) {
+                            drawRect(Color.White.copy(alpha = if (isLight) 0.12f else 0.04f))
+                        }
                     },
                 )
                 .then(activeInteractiveHighlight.modifier)
@@ -1680,7 +1741,8 @@ fun IosSheetSurface(
                 CompositionLocalProvider(
                     LocalContentColor provides colors.content,
                     LocalGlassContentColor provides colors.content,
-                    LocalGroupedListBackgroundAlpha provides SheetGroupedListBackgroundAlpha,
+                    LocalGroupedListBackgroundAlpha provides
+                        if (appearance.usesBackdrop) SheetGroupedListBackgroundAlpha else 1f,
                 ) {
                     content()
                 }

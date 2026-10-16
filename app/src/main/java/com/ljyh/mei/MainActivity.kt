@@ -61,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.SideEffect
@@ -77,6 +78,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -120,6 +122,7 @@ import coil3.request.crossfade
 import com.ljyh.mei.constants.AppBarHeight
 import com.ljyh.mei.constants.AppAppearance
 import com.ljyh.mei.constants.AppAppearanceKey
+import com.ljyh.mei.constants.BetaUpdatesEnabledKey
 import com.ljyh.mei.constants.DeviceIdKey
 import com.ljyh.mei.constants.DynamicThemeKey
 import com.ljyh.mei.constants.AccentColorKey
@@ -135,6 +138,9 @@ import com.ljyh.mei.constants.DownloadsTabEnabledKey
 import com.ljyh.mei.constants.CloudMusicTabEnabledKey
 import com.ljyh.mei.constants.ListeningHistoryTabEnabledKey
 import com.ljyh.mei.constants.NavigationTabOrderKey
+import com.ljyh.mei.constants.KeepBottomBarExpandedKey
+import com.ljyh.mei.constants.LiquidGlassEnabledKey
+import com.ljyh.mei.constants.ReduceTransparencyKey
 import com.ljyh.mei.constants.LastSelectedTabKey
 import com.ljyh.mei.constants.PlayerKeepScreenOnKey
 import com.ljyh.mei.constants.RecognizeClipboardLinksKey
@@ -167,6 +173,8 @@ import com.ljyh.mei.ui.local.LocalDatabase
 import com.ljyh.mei.ui.local.LocalNavController
 import com.ljyh.mei.ui.local.LocalPlayerAwareWindowInsets
 import com.ljyh.mei.ui.local.LocalPlayerConnection
+import com.ljyh.mei.ui.local.LocalPageAppearance
+import com.ljyh.mei.ui.component.player.LocalMiniPlayerAppearance
 import com.ljyh.mei.ui.local.LocalUserData
 import com.ljyh.mei.ui.glass.GlassBottomBar
 import com.ljyh.mei.ui.glass.GlassIconButton
@@ -176,6 +184,8 @@ import com.ljyh.mei.ui.glass.IosBottomSearchToolbar
 import com.ljyh.mei.ui.glass.CompactBottomControlIconSize
 import com.ljyh.mei.ui.glass.LocalGlassBackdrop
 import com.ljyh.mei.ui.glass.LocalGlassColors
+import com.ljyh.mei.ui.glass.GlassAppearance
+import com.ljyh.mei.ui.glass.LocalGlassAppearance
 import com.ljyh.mei.ui.glass.LocalBlurBackdrop
 import com.ljyh.mei.ui.glass.defaultGlassColors
 import com.ljyh.mei.ui.glass.SfIcon
@@ -184,12 +194,14 @@ import com.ljyh.mei.ui.glass.rememberSharedGlassBackdrop
 import com.ljyh.mei.ui.glass.trackBackdropPosition
 import com.ljyh.mei.ui.screen.Index
 import com.ljyh.mei.ui.screen.Screen
+import com.ljyh.mei.ui.screen.account.NeteaseLegacyWebSessionNotice
 import com.ljyh.mei.ui.screen.navigationEntry
 import com.ljyh.mei.ui.screen.search.SearchScreen
 import com.ljyh.mei.ui.navigation.MeiNavEntryViewModelStoreOwner
 import com.ljyh.mei.ui.navigation.MeiNavigator
 import com.ljyh.mei.ui.navigation.MeiRoute
 import com.ljyh.mei.ui.theme.MusicTheme
+import com.ljyh.mei.ui.theme.LocalAccentSeedColor
 import com.ljyh.mei.utils.log.CrashHandler
 import com.ljyh.mei.utils.cache.preloadImage
 import com.ljyh.mei.utils.dataStore
@@ -204,8 +216,10 @@ import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.rememberCanvasBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Interceptor
@@ -261,9 +275,21 @@ class MainActivity : ComponentActivity() {
             val navController = remember(backStack) {
                 MeiNavigator(context = context, backStack = backStack)
             }
-            var active by rememberSaveable {
-                mutableStateOf(false)
+            val pageAppearanceOverrides = remember {
+                mutableStateMapOf<String, Pair<Any, Boolean>>()
             }
+            val registerPageAppearance: (String, Any, Boolean?) -> Unit = remember {
+                { route, owner, isDark ->
+                    if (isDark != null) {
+                        pageAppearanceOverrides[route] = owner to isDark
+                    } else if (pageAppearanceOverrides[route]?.first === owner) {
+                        pageAppearanceOverrides.remove(route)
+                    }
+                }
+            }
+            // Search chrome belongs to the search destination, including back navigation.
+            val active = navController.currentRoute == Screen.Search.route
+            var focusSearchOnEntry by remember { mutableStateOf(false) }
             val dynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
             val accentColorArgb by rememberPreference(AccentColorKey, DefaultAccentColorArgb)
             val appAppearance by rememberEnumPreference(AppAppearanceKey, AppAppearance.System)
@@ -271,6 +297,9 @@ class MainActivity : ComponentActivity() {
             val recognizeClipboardLinks by rememberPreference(RecognizeClipboardLinksKey, false)
             val navigationPreferences by context.dataStore.data
                 .collectAsState<Preferences, Preferences?>(initial = null)
+            val keepBottomBarExpanded = navigationPreferences?.get(KeepBottomBarExpandedKey) ?: false
+            val liquidGlassEnabled = navigationPreferences?.get(LiquidGlassEnabledKey) ?: true
+            val reduceTransparency = navigationPreferences?.get(ReduceTransparencyKey) ?: false
             val podcastsEnabled = navigationPreferences?.get(PodcastsEnabledKey) ?: true
             val downloadsEnabled = navigationPreferences?.get(DownloadsEnabledKey) ?: true
             val cloudMusicEnabled = navigationPreferences?.get(CloudMusicEnabledKey) ?: true
@@ -290,9 +319,23 @@ class MainActivity : ComponentActivity() {
             var startupUpdateResult by remember { mutableStateOf<VersionUpdateResult?>(null) }
 
             LaunchedEffect(Unit) {
-                val result = VersionUpdateChecker.check(BuildConfig.VERSION_NAME)
-                if (result is VersionUpdateResult.UpdateAvailable) {
-                    startupUpdateResult = result
+                try {
+                    val betaUpdatesEnabled = context.dataStore.data.first()[BetaUpdatesEnabledKey] ?: false
+                    val result = VersionUpdateChecker.check(
+                        BuildConfig.VERSION_NAME,
+                        betaUpdatesEnabled = betaUpdatesEnabled,
+                    )
+                    val currentBetaUpdatesEnabled = context.dataStore.data.first()[BetaUpdatesEnabledKey] ?: false
+                    if (result is VersionUpdateResult.UpdateAvailable &&
+                        result.comparisonKnown &&
+                        currentBetaUpdatesEnabled == betaUpdatesEnabled
+                    ) {
+                        startupUpdateResult = result
+                    }
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (_: Exception) {
+                    return@LaunchedEffect
                 }
             }
 
@@ -328,8 +371,8 @@ class MainActivity : ComponentActivity() {
 
                 onDispose {
                     // Compose 销毁时解绑
-                    context.unbindService(connection)
                     playerConnection?.dispose()
+                    context.unbindService(connection)
                     playerConnection = null
                 }
             }
@@ -384,6 +427,11 @@ class MainActivity : ComponentActivity() {
 
             }
             var navigationBarVisible by remember { mutableStateOf(true) }
+            val navigationBarExpanded = keepBottomBarExpanded || navigationBarVisible
+            val keepBottomBarExpandedState = rememberUpdatedState(keepBottomBarExpanded)
+            LaunchedEffect(keepBottomBarExpanded) {
+                if (keepBottomBarExpanded) navigationBarVisible = true
+            }
             val scrollPlayerSheet = remember { mutableStateOf<BottomSheetState?>(null) }
             val searchActiveState = rememberUpdatedState(active)
             val nestedScrollConnection = remember {
@@ -393,6 +441,7 @@ class MainActivity : ComponentActivity() {
                         available: Offset,
                         source: NestedScrollSource
                     ): Offset {
+                        if (keepBottomBarExpandedState.value) return Offset.Zero
                         // Read the actual sheet state for every event. Page scrolling remains
                         // unconsumed, but cannot move the mini player's return target mid-flight.
                         val sheet = scrollPlayerSheet.value
@@ -436,6 +485,11 @@ class MainActivity : ComponentActivity() {
                 Color(accentColorArgb.toInt())
             }
             val effectiveAccent = if (dynamicTheme) targetThemeColor ?: defaultAccent else configuredAccent
+            val accentSeedColor = if (dynamicTheme) {
+                targetThemeColor
+            } else {
+                Color(accentColorArgb.toInt()).takeUnless { accentColorArgb == DefaultAccentColorArgb }
+            }
             MusicTheme(
                 seedColor = effectiveAccent,
                 isDark = effectiveDark,
@@ -468,7 +522,10 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalGlassBackdrop provides glassBackdrop,
                     LocalGlassColors provides glassColors,
+                    LocalGlassAppearance provides GlassAppearance(liquidGlassEnabled, reduceTransparency),
                     LocalBlurBackdrop provides bottomControlsBackdrop,
+                    LocalAccentSeedColor provides accentSeedColor,
+                    LocalPageAppearance provides registerPageAppearance,
                 ) {
                     BoxWithConstraints(
                         modifier = Modifier
@@ -542,11 +599,11 @@ class MainActivity : ComponentActivity() {
                                 !active
                     }
                     // Route visibility must not reset the expanded/compact shape. This keeps a
-                    // MiniNav compact while it fades out, while navigationBarVisible remains the
-                    // only source that changes its shape.
-                    val shouldCompactNavigationBar = !navigationBarVisible
+                    // MiniNav compact while it fades out. The expanded preference overrides
+                    // scrolling without changing which routes can display the navigation bar.
+                    val shouldCompactNavigationBar = !navigationBarExpanded
                     val shouldCompactMiniPlayer =
-                        shouldAllowNavigationBar && !navigationBarVisible
+                        shouldAllowNavigationBar && !navigationBarExpanded
 
 
 
@@ -577,6 +634,10 @@ class MainActivity : ComponentActivity() {
                         collapsedBound = collapsedBound,
                         expandedBound = maxHeight,
                     )
+                    val playerBackgroundReady = remember { mutableStateOf(false) }
+                    val onPlayerBackgroundReadyChanged = remember {
+                        { ready: Boolean -> playerBackgroundReady.value = ready }
+                    }
                     DisposableEffect(playerBottomSheetState) {
                         scrollPlayerSheet.value = playerBottomSheetState
                         onDispose {
@@ -603,7 +664,7 @@ class MainActivity : ComponentActivity() {
                     // background and the recorded backdrops are not re-laid out on every IME frame.
                     val handlesKeyboardInsets = active || currentRoute == Screen.Search.route ||
                         currentRoute?.startsWith("${Screen.PrivateConversation.route}/") == true ||
-                        isPlayerPage
+                        currentRoute?.startsWith("${Screen.Comment.route}/") == true || isPlayerPage
                     DisposableEffect(handlesKeyboardInsets) {
                         val previousMode = window.attributes.softInputMode
                         if (handlesKeyboardInsets) {
@@ -616,6 +677,8 @@ class MainActivity : ComponentActivity() {
                             if (handlesKeyboardInsets) window.setSoftInputMode(previousMode)
                         }
                     }
+                    val pageDarkAppearance = currentRoute?.let { pageAppearanceOverrides[it]?.second }
+                    val statusBarDark = isPlayerPage || (pageDarkAppearance ?: effectiveDark)
                     SideEffect {
                         val transparent = android.graphics.Color.TRANSPARENT
                         enableEdgeToEdge(
@@ -624,7 +687,7 @@ class MainActivity : ComponentActivity() {
                                 // keep its foreground white regardless of the app theme.
                                 SystemBarStyle.dark(transparent)
                             } else {
-                                SystemBarStyle.auto(transparent, transparent) { effectiveDark }
+                                SystemBarStyle.auto(transparent, transparent) { statusBarDark }
                             },
                             navigationBarStyle = SystemBarStyle.auto(transparent, transparent) {
                                 effectiveDark
@@ -633,7 +696,7 @@ class MainActivity : ComponentActivity() {
                         // Keep this explicit because the API 35+ edge-to-edge implementation can
                         // retain the previous appearance while the bottom sheet settles.
                         windowInsetsController.isAppearanceLightStatusBars =
-                            !isPlayerPage && !effectiveDark
+                            !statusBarDark
                         if (isPlayerPage && keepScreenOnInPlayer) {
                             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         } else {
@@ -648,29 +711,27 @@ class MainActivity : ComponentActivity() {
                     val (query, onQueryChange) = rememberSaveable(stateSaver = TextFieldValue.Saver) {
                         mutableStateOf(TextFieldValue())
                     }
-                    val onActiveChange: (Boolean) -> Unit = { newActive ->
-                        active = newActive
-                        if (!newActive) {
-                            focusManager.clearFocus()
-                            if (navigationItems.fastAny { it.route == currentRoute } ||
-                                currentRoute == Screen.Search.route
-                            ) {
-                                onQueryChange(TextFieldValue())
-                            }
+                    val clearSearchInput = {
+                        focusManager.clearFocus()
+                        onQueryChange(TextFieldValue())
+                        focusSearchOnEntry = false
+                    }
+                    LaunchedEffect(active) {
+                        if (!active) {
+                            clearSearchInput()
                         }
                     }
 
                     val onSearchCancel = {
-                        val isSearchRoute = currentRoute == Screen.Search.route
-                        onActiveChange(false)
-                        if (isSearchRoute) {
+                        clearSearchInput()
+                        if (navController.currentRoute == Screen.Search.route) {
                             navController.popBackStack()
                         }
                     }
 
                     val onSearch: (String) -> Unit = {
                         if (it.isNotEmpty()) {
-                            onActiveChange(false)
+                            clearSearchInput()
                             Screen.SearchResult.navigate(navController){
                                 addPath(Uri.encode(it))
                                 addPath("1") // 默认所搜单曲
@@ -770,6 +831,17 @@ class MainActivity : ComponentActivity() {
                                     .fillMaxSize()
                                     // Keep sibling player/nav draw invalidations from recording
                                     // the unchanged page again. Child updates remain live.
+                                    .layout { measurable, constraints ->
+                                        val placeable = measurable.measure(constraints)
+                                        layout(placeable.width, placeable.height) {
+                                            // SurfaceView clears a hole after Compose draws. An
+                                            // opaque player therefore does not automatically
+                                            // cull the home page's text/images/glass underneath.
+                                            if (!playerBottomSheetState.isExpanded || !playerBackgroundReady.value) {
+                                                placeable.place(0, 0)
+                                            }
+                                        }
+                                    }
                                     .graphicsLayer()
                                     .layerBackdrop(bottomBackdrop)
                                     .trackBackdropPosition(bottomBackdrop),
@@ -874,14 +946,14 @@ class MainActivity : ComponentActivity() {
                                                     meiRoute.route,
                                                     bottomInset,
                                                     navigationItems,
-                                                    navigationBarVisible,
+                                                    navigationBarExpanded,
                                                     playerDismissed,
                                                     windowsInsets,
                                                 ) {
                                                     playerAwareWindowInsetsForRoute(
                                                         route = meiRoute.route,
                                                         navigationItems = navigationItems,
-                                                        navigationBarVisible = navigationBarVisible,
+                                                        navigationBarVisible = navigationBarExpanded,
                                                         playerDismissed = playerDismissed,
                                                         windowsInsets = windowsInsets,
                                                         bottomInset = bottomInset,
@@ -934,9 +1006,7 @@ class MainActivity : ComponentActivity() {
                                                             addPath(type.toString())
                                                         }
                                                     },
-                                                    onDismiss = {
-                                                        onActiveChange(false)
-                                                    },
+                                                    onDismiss = clearSearchInput,
                                                     modifier = Modifier
                                                         .fillMaxSize()
                                                         .padding(top = windowsInsets.asPaddingValues().calculateTopPadding())
@@ -951,6 +1021,8 @@ class MainActivity : ComponentActivity() {
                             compactProgress = compactMiniPlayerProgress,
                             state = playerBottomSheetState,
                             backdrop = bottomControlsBackdrop,
+                            pageDarkAppearance = pageDarkAppearance,
+                            onBackgroundReadyChanged = onPlayerBackgroundReadyChanged,
                         )
                         AnimatedVisibility(
                             visible = active,
@@ -975,6 +1047,7 @@ class MainActivity : ComponentActivity() {
                                     cancelLabel = stringResource(R.string.cancel),
                                     placeholder = stringResource(R.string.search_bar_search),
                                     focusRequester = searchBarFocusRequester,
+                                    autoFocus = focusSearchOnEntry,
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .padding(horizontal = 12.dp)
@@ -1019,10 +1092,10 @@ class MainActivity : ComponentActivity() {
                                     }
                                 },
                                 onSearchClick = {
+                                    focusSearchOnEntry = true
                                     if (currentRoute != Screen.Search.route) {
                                         navController.navigate(Screen.Search.route)
                                     }
-                                    onActiveChange(true)
                                 },
                                 backdrop = bottomControlsBackdrop,
                                 playerBottomSheetState = playerBottomSheetState,
@@ -1092,6 +1165,7 @@ class MainActivity : ComponentActivity() {
                                 },
                             )
                         }
+                        if (!pictureInPictureMode) NeteaseLegacyWebSessionNotice()
                         VersionUpdateAlert(
                             result = startupUpdateResult,
                             onDismiss = { startupUpdateResult = null },
@@ -1131,6 +1205,8 @@ private fun BoxScope.AnimatedMiniPlayerLayer(
     compactProgress: State<Float>,
     state: BottomSheetState,
     backdrop: Backdrop,
+    pageDarkAppearance: Boolean?,
+    onBackgroundReadyChanged: (Boolean) -> Unit,
 ) {
     val miniPlayerVerticalOffset = remember(compactProgress) {
         { (NavigationBarHeight - 16.dp) * compactProgress.value }
@@ -1144,12 +1220,14 @@ private fun BoxScope.AnimatedMiniPlayerLayer(
             // MiniPlayer is rendered by BottomSheetPlayer's collapsed content. Give it the page
             // sample layer while keeping page/player glass out of that source.
             LocalGlassBackdrop provides backdrop,
+            LocalMiniPlayerAppearance provides pageDarkAppearance,
         ) {
             BottomSheetPlayer(
                 state = state,
                 modifier = Modifier.fillMaxSize(),
                 compactMiniPlayerProgress = compactProgress,
                 miniPlayerVerticalOffset = miniPlayerVerticalOffset,
+                onBackgroundReadyChanged = onBackgroundReadyChanged,
             )
         }
     }

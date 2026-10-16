@@ -171,6 +171,11 @@
 
 # ONNX Runtime's JNI and reflective Java API are required by minimized builds.
 -keep class ai.onnxruntime.** { *; }
+-keep class com.aegis.sdk.AegisNative { *; }
+-keep class com.ljyh.mei.data.network.NeteaseNativeLogPolicy { *; }
+-keepclassmembers class com.ljyh.mei.data.network.NeteaseAegisSecurity$AegisNetworkLayer {
+    public void requireKey(int, java.lang.String, long);
+}
 
 # The bundled FFmpeg extension renderer is loaded reflectively by DefaultRenderersFactory;
 # keep the classes and the native entry points used by the JNI layer.

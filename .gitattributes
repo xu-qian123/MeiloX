@@ -1,0 +1,3 @@
+# SDK assets contain binary signing/device data, not editable text. Preserve bytes
+# across Windows checkouts; whitespace and line-ending rewrites corrupt them.
+app/src/main/assets/*.dat binary

@@ -65,6 +65,7 @@ data class IosCascadingMenuItem(
     val destructive: Boolean = false,
     val separatorBefore: Boolean = false,
     val children: List<IosCascadingMenuItem> = emptyList(),
+    val enabled: Boolean = true,
     val onClick: () -> Unit = {},
 )
 
@@ -143,6 +144,7 @@ fun IosCascadingMenu(
         backdrop = backdrop,
         externalAnchorBounds = anchorBounds,
         keepAnchorVisible = true,
+        fullScreen = true,
         menuScale = 1f - 0.04f * child.value.coerceIn(0f, 1f),
         onMenuBoundsChanged = { menuBounds = it },
         onMenuAlphaChanged = { onTriggerAlphaChanged?.invoke(1f - it) },
@@ -163,7 +165,7 @@ fun IosCascadingMenu(
                         MenuHeaderAction(
                             action = action,
                             iconTint = if (action.destructive) colors.destructive else if (useAccentIcons) colors.accent else colors.content,
-                            enabled = open && selectedIndex == null,
+                            enabled = action.enabled && open && selectedIndex == null,
                             modifier = Modifier.weight(1f),
                             onClick = { close(action.onClick) },
                         )
@@ -188,7 +190,7 @@ fun IosCascadingMenu(
                 destructive = item.destructive,
                 backdrop = childBackdrop,
                 iconTint = if (item.destructive) colors.destructive else if (useAccentIcons) colors.accent else colors.content,
-                enabled = selectedIndex == null,
+                enabled = item.enabled && selectedIndex == null,
                 modifier = Modifier.graphicsLayer {
                     alpha = if (selectedIndex == index) 0f else 1f - 0.58f * child.value.coerceIn(0f, 1f)
                 }.then(if (selectedIndex != null) Modifier.semantics { hideFromAccessibility() } else Modifier),
@@ -253,6 +255,7 @@ fun IosCascadingMenu(
                     menuWidth = menuWidth,
                     heightOverride = 64.dp + (targetHeight - 64.dp) * p,
                     shadowAlpha = p,
+                    highlightAlpha = p,
                     itemCount = selected.children.size + 1,
                 ) { childBackdrop ->
                     IosMenuItem(
@@ -262,7 +265,7 @@ fun IosCascadingMenu(
                         destructive = selected.destructive,
                         fontWeight = FontWeight((400 + 200 * p).roundToInt()),
                         backdrop = childBackdrop,
-                        enabled = open,
+                        enabled = selected.enabled && open,
                         trailing = { MenuChevron(90f * p, if (childExpanded) expandedDescription else collapsedDescription) },
                         onClick = { childExpanded = !childExpanded },
                     )
@@ -275,7 +278,7 @@ fun IosCascadingMenu(
                             IosMenuItem(
                                 title = item.title,
                                 backdrop = childBackdrop,
-                                enabled = open && childExpanded && p > 0.95f,
+                                enabled = item.enabled && open && childExpanded && p > 0.95f,
                                 onClick = { close(item.onClick) },
                             )
                         }

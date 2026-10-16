@@ -123,8 +123,6 @@ fun AppleMusicPlayer(
     val mediaMetadata by stateContainer.mediaMetadata
     val isPlaying by stateContainer.isPlaying
     val playbackState by stateContainer.playbackState
-    val sliderPosition by remember { derivedStateOf { stateContainer.sliderPosition } }
-    val duration by remember { derivedStateOf { stateContainer.duration } }
     val isDragging by remember { derivedStateOf { stateContainer.isDragging } }
     val lyricLine by remember { derivedStateOf { stateContainer.lyricLine } }
     val isLiked by stateContainer.isLiked
@@ -251,8 +249,10 @@ fun AppleMusicPlayer(
             },
             collapsedContent = {
                 MiniPlayer(
-                    position = sliderPosition.toLong(),
-                    duration = duration,
+                    // The mini player has no progress indicator, so it does not
+                    // need to subscribe to the expanded player's position clock.
+                    position = 0L,
+                    duration = 0L,
                     backdrop = collapsedBackdrop,
                     compactProgress = compactMiniPlayerProgress,
                     onClick = state::expandSoft,
@@ -262,6 +262,7 @@ fun AppleMusicPlayer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .graphicsLayer()
                     .layerBackdrop(playerContentBackdrop)
                     .trackBackdropPosition(playerContentBackdrop),
             ) {
@@ -427,8 +428,8 @@ fun AppleMusicPlayer(
                             }
 
                             PlayerControlsSection(
-                                sliderPosition = sliderPosition,
-                                duration = duration,
+                                position = { stateContainer.sliderPosition.toLong() },
+                                duration = { stateContainer.duration },
                                 isPlaying = isPlaying,
                                 playbackState = playbackState,
                                 playerConnection = stateContainer.playerConnection,
@@ -469,6 +470,8 @@ fun AppleMusicPlayer(
             }
             Box(
                 modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer()
                     .layerBackdrop(playerCoverBackdrop)
                     .trackBackdropPosition(playerCoverBackdrop),
             ) {

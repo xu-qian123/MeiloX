@@ -3,7 +3,7 @@ package com.ljyh.mei.ui.component.player.state
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -22,6 +22,7 @@ import com.ljyh.mei.data.model.room.Playlist
 import com.ljyh.mei.data.network.Resource
 import com.ljyh.mei.playback.PlayerConnection
 import com.ljyh.mei.ui.component.player.PlayerViewModel
+import com.ljyh.mei.ui.component.utils.LifecycleStartedEffect
 import com.ljyh.mei.ui.local.LocalPlayerConnection
 import com.ljyh.mei.ui.model.LyricData
 import com.ljyh.mei.ui.model.LyricSource
@@ -110,7 +111,6 @@ class PlayerStateContainer(
         internal set
 
     fun reset() {
-        lyricLine = createDefaultLyricData("歌词加载中", source = LyricSource.Loading)
         sliderPosition = 0f
         duration = 0L
         isDragging = false
@@ -153,19 +153,19 @@ fun rememberPlayerStateContainer(
         )
     }
 
-    container.playbackState = playerConnection.playbackState.collectAsState()
-    container.isPlaying = playerConnection.isPlaying.collectAsState()
-    container.mediaMetadata = playerConnection.mediaMetadata.collectAsState()
-    container.canSkipPrevious = playerConnection.canSkipPrevious.collectAsState()
-    container.canSkipNext = playerConnection.canSkipNext.collectAsState()
-    container.isFMMode = playerConnection.isFMMode.collectAsState()
+    container.playbackState = playerConnection.playbackState.collectAsStateWithLifecycle()
+    container.isPlaying = playerConnection.isPlaying.collectAsStateWithLifecycle()
+    container.mediaMetadata = playerConnection.mediaMetadata.collectAsStateWithLifecycle()
+    container.canSkipPrevious = playerConnection.canSkipPrevious.collectAsStateWithLifecycle()
+    container.canSkipNext = playerConnection.canSkipNext.collectAsStateWithLifecycle()
+    container.isFMMode = playerConnection.isFMMode.collectAsStateWithLifecycle()
 
-    container.lyricResult = playerViewModel.lyric.collectAsState()
-    container.lyricOffsetMs = playerViewModel.lyricOffset.collectAsState()
-    container.qqLyricSearch = playerViewModel.searchResult.collectAsState()
-    container.checkSongLike = playerViewModel.like.collectAsState()
-    container.allPlaylist = playerViewModel.localPlaylists.collectAsState()
-    container.myPlaylist = playerViewModel.myPlaylists.collectAsState()
+    container.lyricResult = playerViewModel.lyric.collectAsStateWithLifecycle()
+    container.qqLyricSearch = playerViewModel.searchResult.collectAsStateWithLifecycle()
+    container.checkSongLike = playerViewModel.like.collectAsStateWithLifecycle()
+    container.allPlaylist = playerViewModel.localPlaylists.collectAsStateWithLifecycle()
+    container.myPlaylist = playerViewModel.myPlaylists.collectAsStateWithLifecycle()
+    container.lyricOffsetMs = playerViewModel.lyricOffset.collectAsStateWithLifecycle()
 
     container.isLiked = remember {
         derivedStateOf {
@@ -187,16 +187,16 @@ fun rememberPlayerStateContainer(
         }
     }
 
-    // The collapsed player does not render a progress indicator. Avoid publishing a 50 ms
+    // The collapsed player does not render a progress indicator. Avoid publishing a periodic
     // Compose-state tick while it is hidden, but resume immediately as soon as the expanded
     // player starts consuming the position.
-    LaunchedEffect(
+    LifecycleStartedEffect(
         container.playbackState.value,
         container.isPlaying.value,
         container.isDragging,
         progressUpdatesEnabled,
     ) {
-        if (!progressUpdatesEnabled) return@LaunchedEffect
+        if (!progressUpdatesEnabled) return@LifecycleStartedEffect
 
         val playbackState = container.playbackState.value
         val isPlaying = container.isPlaying.value
@@ -206,7 +206,9 @@ fun rememberPlayerStateContainer(
             while (isActive) {
                 container.sliderPosition = playerConnection.player.currentPosition.toFloat()
                 container.duration = playerConnection.player.duration.coerceAtLeast(1L)
-                delay(50)
+                // Progress needs four updates per second; lyrics and audio response
+                // use their own faster clocks.
+                delay(250)
             }
         } else if (!isPlaying && !isDragging) {
             container.sliderPosition = playerConnection.player.currentPosition.toFloat()
@@ -238,6 +240,7 @@ fun rememberPlayerStateContainer(
             container.currentSongId = meta.id.toString()
             container.reset()
             playerViewModel.lyricManager.loadLyrics(meta)
+            container.lyricLine = playerViewModel.lyricManager.lyricData.value
         }
     }
 
@@ -245,8 +248,8 @@ fun rememberPlayerStateContainer(
         container.lyricLine = container.lyricResult.value
     }
 
-    val currentWindowIndex by playerConnection.currentWindowIndex.collectAsState()
-    val queueWindows by playerConnection.queueWindows.collectAsState()
+    val currentWindowIndex by playerConnection.currentWindowIndex.collectAsStateWithLifecycle()
+    val queueWindows by playerConnection.queueWindows.collectAsStateWithLifecycle()
 
     LaunchedEffect(currentWindowIndex, queueWindows.size) {
         val idx = currentWindowIndex

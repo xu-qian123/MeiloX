@@ -20,6 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.ljyh.mei.R
 import com.ljyh.mei.constants.AccompanimentLyricTextBoldKey
@@ -29,7 +33,9 @@ import com.ljyh.mei.constants.CoverStyle
 import com.ljyh.mei.constants.CoverStyleKey
 import com.ljyh.mei.constants.DebugKey
 import com.ljyh.mei.constants.DefaultAccentColorArgb
+import com.ljyh.mei.constants.DefaultInterfaceLetterSpacing
 import com.ljyh.mei.constants.DynamicThemeKey
+import com.ljyh.mei.constants.InterfaceLetterSpacingKey
 import com.ljyh.mei.constants.LyricTextSize
 import com.ljyh.mei.constants.MeshFlowSpeedKey
 import com.ljyh.mei.constants.MeshLowFreqVolumeKey
@@ -43,6 +49,14 @@ import com.ljyh.mei.constants.OriginalCoverKey
 import com.ljyh.mei.constants.PlayerStyle
 import com.ljyh.mei.constants.LibraryStyle
 import com.ljyh.mei.constants.LibraryStyleKey
+import com.ljyh.mei.constants.LibraryDefaultPageKey
+import com.ljyh.mei.constants.KeepBottomBarExpandedKey
+import com.ljyh.mei.constants.LiquidGlassEnabledKey
+import com.ljyh.mei.constants.ReduceTransparencyKey
+import com.ljyh.mei.constants.PodcastsEnabledKey
+import com.ljyh.mei.constants.DownloadsEnabledKey
+import com.ljyh.mei.constants.CloudMusicEnabledKey
+import com.ljyh.mei.constants.ListeningHistoryEnabledKey
 import com.ljyh.mei.constants.PlayerKeepScreenOnKey
 import com.ljyh.mei.constants.PlayerStyleKey
 import com.ljyh.mei.constants.PlaylistCoverStyle
@@ -54,16 +68,21 @@ import com.ljyh.mei.constants.TabletAnimationStyle
 import com.ljyh.mei.constants.TabletAnimationStyleKey
 import com.ljyh.mei.ui.glass.GlassCard
 import com.ljyh.mei.ui.glass.GlassIconButton
+import com.ljyh.mei.ui.glass.GlassSlider
 import com.ljyh.mei.ui.glass.GlassToggle
 import com.ljyh.mei.ui.glass.SfIcon
 import com.ljyh.mei.ui.glass.SfSymbol
 import com.ljyh.mei.ui.glass.IosColorPicker
 import com.ljyh.mei.ui.glass.IosPinnedListPage
 import com.ljyh.mei.ui.glass.IosPopupButton
+import com.ljyh.mei.ui.glass.IosTypography
 import com.ljyh.mei.ui.local.LocalNavController
 import com.ljyh.mei.ui.local.LocalPlayerAwareWindowInsets
+import com.ljyh.mei.ui.navigation.ContentFeature
+import com.ljyh.mei.ui.navigation.LibraryPage
 import com.ljyh.mei.utils.rememberEnumPreference
 import com.ljyh.mei.utils.rememberPreference
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,11 +93,34 @@ fun AppearanceSettings(
     val insets = LocalPlayerAwareWindowInsets.current.asPaddingValues()
     val (dynamicTheme, setDynamicTheme) = rememberPreference(DynamicThemeKey, true)
     val (accentColorArgb, setAccentColorArgb) = rememberPreference(AccentColorKey, DefaultAccentColorArgb)
+    val (letterSpacing, setLetterSpacing) = rememberPreference(InterfaceLetterSpacingKey, DefaultInterfaceLetterSpacing)
     val customAccent = accentColorArgb != DefaultAccentColorArgb
     var showColorPicker by remember { mutableStateOf(false) }
     val (playlistStyle, setPlaylistStyle) = rememberEnumPreference(PlaylistCoverStyleKey, PlaylistCoverStyle.Cover)
     val (playlistHeader, setPlaylistHeader) = rememberPreference(PlaylistTrackTableHeaderKey, false)
     val (libraryStyle, setLibraryStyle) = rememberEnumPreference(LibraryStyleKey, LibraryStyle.Default)
+    val (libraryDefaultPage, setLibraryDefaultPage) = rememberPreference(LibraryDefaultPageKey, "")
+    val (keepBottomBarExpanded, setKeepBottomBarExpanded) = rememberPreference(KeepBottomBarExpandedKey, false)
+    val (liquidGlassEnabled, setLiquidGlassEnabled) = rememberPreference(LiquidGlassEnabledKey, true)
+    val (reduceTransparency, setReduceTransparency) = rememberPreference(ReduceTransparencyKey, false)
+    val podcastsEnabled by rememberPreference(PodcastsEnabledKey, true)
+    val downloadsEnabled by rememberPreference(DownloadsEnabledKey, true)
+    val cloudMusicEnabled by rememberPreference(CloudMusicEnabledKey, true)
+    val historyEnabled by rememberPreference(ListeningHistoryEnabledKey, true)
+    val libraryDefaultPages = LibraryPage.entries.filter { page ->
+        when (page.requiredFeature) {
+            ContentFeature.Podcasts -> podcastsEnabled && libraryStyle == LibraryStyle.AppleMusic
+            ContentFeature.Downloads -> downloadsEnabled
+            ContentFeature.CloudMusic -> cloudMusicEnabled
+            ContentFeature.ListeningHistory -> historyEnabled
+            null -> true
+        }
+    }.map(LibraryPage::name)
+    val displayedLibraryDefaultPage = when {
+        libraryStyle == LibraryStyle.Default && libraryDefaultPage == LibraryPage.Podcasts.name && podcastsEnabled -> LibraryPage.Albums.name
+        libraryDefaultPage in libraryDefaultPages -> libraryDefaultPage
+        else -> ""
+    }
     val (playerStyle, setPlayerStyle) = rememberEnumPreference(PlayerStyleKey, PlayerStyle.AppleMusic)
     val (keepScreenOn, setKeepScreenOn) = rememberPreference(PlayerKeepScreenOnKey, false)
     val (originalCover, setOriginalCover) = rememberPreference(OriginalCoverKey, false)
@@ -122,6 +164,33 @@ fun AppearanceSettings(
                     },
                     enabled = !dynamicTheme,
                 )
+                AppearanceLetterSpacing(letterSpacing, setLetterSpacing)
+            }
+        }
+        item {
+            SettingsGroup(stringResource(R.string.appearance_interface)) {
+                AppearanceToggle(
+                    R.string.appearance_fixed_bottom_bar,
+                    R.string.appearance_fixed_bottom_bar_description,
+                    "rectangle.split.3x1.fill",
+                    keepBottomBarExpanded,
+                    setKeepBottomBarExpanded,
+                )
+                AppearanceToggle(
+                    R.string.appearance_liquid_glass,
+                    R.string.appearance_liquid_glass_description,
+                    "square.on.square",
+                    liquidGlassEnabled,
+                    setLiquidGlassEnabled,
+                    enabled = !reduceTransparency,
+                )
+                AppearanceToggle(
+                    R.string.appearance_reduce_transparency,
+                    R.string.appearance_reduce_transparency_description,
+                    "circle.lefthalf.filled",
+                    reduceTransparency,
+                    setReduceTransparency,
+                )
             }
         }
         item {
@@ -130,6 +199,17 @@ fun AppearanceSettings(
                     R.string.appearance_library_style, "music.note.list", libraryStyle, LibraryStyle.entries,
                     { if (it == LibraryStyle.AppleMusic) "Apple Music" else stringResource(R.string.appearance_accent_default) },
                     setLibraryStyle,
+                )
+                AppearanceChoice(
+                    R.string.appearance_library_default_page,
+                    "music.note.list",
+                    displayedLibraryDefaultPage,
+                    listOf("") + libraryDefaultPages,
+                    { value ->
+                        LibraryPage.entries.firstOrNull { it.name == value }?.let { stringResource(it.titleRes) }
+                            ?: stringResource(R.string.appearance_accent_default)
+                    },
+                    setLibraryDefaultPage,
                 )
             }
         }
@@ -220,15 +300,56 @@ fun AppearanceSettings(
 }
 
 @Composable
+private fun AppearanceLetterSpacing(savedSpacing: Float, setSpacing: (Float) -> Unit) {
+    val spacing = (savedSpacing.takeIf { it.isFinite() } ?: DefaultInterfaceLetterSpacing).coerceIn(0f, 3f)
+    // Keep the latest local edit visible while consecutive preference writes settle.
+    var draftSpacing by remember { mutableStateOf<Float?>(null) }
+    val displayedSpacing = draftSpacing ?: spacing
+    val title = stringResource(R.string.appearance_letter_spacing)
+    val valueLabel = stringResource(R.string.appearance_letter_spacing_value, displayedSpacing)
+
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SfIcon("textformat.size", null)
+                Text(title, Modifier.weight(1f).padding(horizontal = 13.dp))
+                Text(valueLabel, style = IosTypography.subheadline, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            GlassSlider(
+                value = displayedSpacing,
+                onValueChange = { draftSpacing = it },
+                onValueChangeFinished = {
+                    val rounded = ((draftSpacing ?: spacing) * 10f).roundToInt() / 10f
+                    draftSpacing = rounded
+                    setSpacing(rounded)
+                },
+                valueRange = 0f..3f,
+                modifier = Modifier.padding(horizontal = 10.dp).semantics {
+                    contentDescription = title
+                    stateDescription = valueLabel
+                },
+            )
+        }
+    }
+}
+
+@Composable
 private fun AppearanceToggle(
     titleRes: Int,
     descriptionRes: Int?,
     systemName: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    enabled: Boolean = true,
 ) {
-    GlassCard(Modifier.fillMaxWidth(), onClick = { onCheckedChange(!checked) }) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+    GlassCard(
+        Modifier.fillMaxWidth().semantics { if (!enabled) disabled() },
+        onClick = if (enabled) ({ onCheckedChange(!checked) }) else null,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().alpha(if (enabled) 1f else 0.38f).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             SfIcon(systemName, null)
             Column(Modifier.weight(1f).padding(horizontal = 13.dp)) {
                 Text(stringResource(titleRes))
@@ -236,7 +357,7 @@ private fun AppearanceToggle(
                     Text(stringResource(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            GlassToggle(checked, onCheckedChange)
+            GlassToggle(checked, onCheckedChange, enabled = enabled)
         }
     }
 }

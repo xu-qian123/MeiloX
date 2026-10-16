@@ -12,24 +12,31 @@ import org.junit.Test
 
 class PlaybackSourcePolicyTest {
     @Test
+    fun offlineFallbackReportsTheQualityOfTheCachedRepresentation() {
+        assertEquals("lossless", cachedPlaybackQuality("123", playbackCacheKey("123", "LOSSLESS", "abc", 10L), "exhigh"))
+        assertEquals("higher", cachedPlaybackQuality("123", playbackCacheKey("123", "higher", "abc", 10L), "lossless"))
+        assertEquals("exhigh", cachedPlaybackQuality("123", playbackCacheKey("456", "lossless", "abc", 10L), "EXHIGH"))
+    }
+
+    @Test
     fun qualityFallbacksFollowTheRequestedQuality() {
         assertEquals(
-            listOf("jymaster", "sky", "jyeffect", "hires", "lossless", "exhigh", "higher", "standard"),
+            listOf("jymaster", "hires", "lossless", "exhigh", "standard"),
             playbackQualityFallbacks("JYMASTER"),
         )
         assertEquals(
-            listOf("jyeffect", "hires", "lossless", "exhigh", "higher", "standard"),
+            listOf("jyeffect", "lossless", "exhigh", "standard"),
             playbackQualityFallbacks("jyeffect"),
         )
         assertEquals(listOf("standard"), playbackQualityFallbacks(" standard "))
-        assertEquals(listOf("higher", "standard"), playbackQualityFallbacks("higher"))
-        assertEquals(listOf("future", "exhigh", "higher", "standard"), playbackQualityFallbacks("future"))
+        assertEquals(listOf("exhigh", "standard"), playbackQualityFallbacks("higher"))
+        assertEquals(listOf("exhigh", "standard"), playbackQualityFallbacks("future"))
     }
 
     @Test
     fun unavailableQualityAndLoginResponsesAllowFallbackButServerErrorsDoNot() {
-        listOf(200, 301, 401, 403, 404).forEach { assertTrue(shouldTryLowerPlaybackQuality(it)) }
-        listOf(429, 500, 503).forEach { assertFalse(shouldTryLowerPlaybackQuality(it)) }
+        listOf(200, 301, 401, 403, 404).forEach { assertTrue(shouldTryLowerPlaybackQualityResponse(it)) }
+        listOf(429, 500, 503).forEach { assertFalse(shouldTryLowerPlaybackQualityResponse(it)) }
     }
 
     @Test

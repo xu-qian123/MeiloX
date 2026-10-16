@@ -6,6 +6,11 @@ import java.util.Locale
 
 private const val PLAYBACK_CACHE_KEY_VERSION = "meilox-media-v3"
 
+// Include legacy cache qualities when recovering an already downloaded representation.
+internal val playbackQualityOrder = listOf(
+    "dolby", "jymaster", "sky", "jyeffect", "hires", "lossless", "exhigh", "higher", "standard",
+)
+
 /** Normalizes quality values from preferences, API responses, and enum names. */
 internal fun normalizePlaybackQuality(quality: String): String =
     quality.trim().lowercase(Locale.ROOT).ifBlank { MusicQuality.EXHIGH.text }
@@ -17,17 +22,62 @@ internal fun effectivePlaybackQuality(sourceQuality: String?, attemptedQuality: 
         ?.let(::normalizePlaybackQuality)
         ?: normalizePlaybackQuality(attemptedQuality)
 
-// Adapted from NeriPlayer's PlayerUrlResolver (GPL-3.0).
-internal val playbackQualityOrder = listOf(
-    "jymaster", "sky", "jyeffect", "hires", "lossless", "exhigh", "higher", "standard",
-)
-
-/** Returns the requested quality followed by progressively lower supported qualities. */
-internal fun playbackQualityFallbacks(requestedQuality: String): List<String> {
-    val quality = normalizePlaybackQuality(requestedQuality)
-    val index = playbackQualityOrder.indexOf(quality)
-    return if (index >= 0) playbackQualityOrder.drop(index)
-    else listOf(quality, "exhigh", "higher", "standard").distinct()
+/**
+ * Returns the requested quality followed by the progressively lower qualities
+ * supported by the NetEase player endpoint.
+ */
+internal fun playbackQualityFallbacks(requestedQuality: String): List<String> = when (
+    normalizePlaybackQuality(requestedQuality)
+) {
+    MusicQuality.STANDARD.text -> listOf(MusicQuality.STANDARD.text)
+    MusicQuality.EXHIGH.text -> listOf(
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    MusicQuality.LOSSLESS.text -> listOf(
+        MusicQuality.LOSSLESS.text,
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    MusicQuality.HIRES.text -> listOf(
+        MusicQuality.HIRES.text,
+        MusicQuality.LOSSLESS.text,
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    MusicQuality.JYEFFECT.text -> listOf(
+        MusicQuality.JYEFFECT.text,
+        MusicQuality.LOSSLESS.text,
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    MusicQuality.SKY.text -> listOf(
+        MusicQuality.SKY.text,
+        MusicQuality.JYEFFECT.text,
+        MusicQuality.LOSSLESS.text,
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    MusicQuality.JYMASTER.text -> listOf(
+        MusicQuality.JYMASTER.text,
+        MusicQuality.HIRES.text,
+        MusicQuality.LOSSLESS.text,
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    MusicQuality.DOLBY.text -> listOf(
+        MusicQuality.DOLBY.text,
+        MusicQuality.SKY.text,
+        MusicQuality.JYEFFECT.text,
+        MusicQuality.HIRES.text,
+        MusicQuality.LOSSLESS.text,
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
+    else -> listOf(
+        MusicQuality.EXHIGH.text,
+        MusicQuality.STANDARD.text,
+    )
 }
 
 /** Prefer the selected quality, then lower ones; other cached qualities are a last resort. */
@@ -51,7 +101,7 @@ internal fun selectCachedPlaybackKey(
 }
 
 /** Login/permission/unavailable-quality responses can still have a playable lower level. */
-internal fun shouldTryLowerPlaybackQuality(responseCode: Int): Boolean =
+internal fun shouldTryLowerPlaybackQualityResponse(responseCode: Int): Boolean =
     responseCode in setOf(200, 301, 401, 403, 404)
 
 /** Identifies the exact media bytes returned for a logical quality. */
@@ -69,6 +119,14 @@ internal fun playbackCacheKeyPrefix(mediaId: String, quality: String): String =
 /** Prefix shared by every playback cache entry for one song. */
 internal fun playbackCacheKeyPrefix(mediaId: String): String =
     "$PLAYBACK_CACHE_KEY_VERSION:${mediaId.trim()}:"
+
+/** A complete offline fallback can contain different bytes/quality than requested. */
+internal fun cachedPlaybackQuality(mediaId: String, cacheKey: String, requestedQuality: String): String {
+    val prefix = playbackCacheKeyPrefix(mediaId)
+    val cached = cacheKey.takeIf { it.startsWith(prefix) }
+        ?.removePrefix(prefix)?.substringBefore(':')?.takeIf(String::isNotBlank)
+    return normalizePlaybackQuality(cached ?: requestedQuality)
+}
 
 /**
  * Builds a disk cache key for the exact server-returned source.
@@ -88,3 +146,17 @@ internal fun playbackCacheKey(
 /** Returns whether the current source should be invalidated and retried in place. */
 internal fun shouldRefreshPlaybackSource(errorCode: Int): Boolean =
     errorCode == PlaybackException.ERROR_CODE_IO_READ_POSITION_OUT_OF_RANGE
+
+/** Retries a different full source when the device cannot decode or render these bytes. */
+internal fun shouldTryLowerPlaybackQuality(errorCode: Int): Boolean = when (errorCode) {
+    PlaybackException.ERROR_CODE_DECODER_INIT_FAILED,
+    PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
+    PlaybackException.ERROR_CODE_DECODING_FAILED,
+    PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES,
+    PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
+    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+    PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
+    PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED,
+    PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED -> true
+    else -> false
+}

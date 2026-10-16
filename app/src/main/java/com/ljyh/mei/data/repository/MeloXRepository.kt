@@ -1,15 +1,34 @@
 package com.ljyh.mei.data.repository
 
+import android.app.Activity
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.util.Log
-import com.google.gson.Gson
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.Preferences
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.Gson
 import com.ljyh.mei.BuildConfig
+import com.ljyh.mei.constants.CookieKey
+import com.ljyh.mei.constants.DeviceIdKey
+import com.ljyh.mei.constants.NeteaseCsrfKey
+import com.ljyh.mei.constants.NeteaseMusicAKey
+import com.ljyh.mei.constants.NeteaseRefreshTokenKey
+import com.ljyh.mei.constants.NeteaseUrsAppIdKey
+import com.ljyh.mei.constants.NeteaseSecurityIdentityKey
+import com.ljyh.mei.constants.NeteaseLocalDeviceIdKey
+import com.ljyh.mei.constants.NeteaseDeviceRegisteredModelKey
+import com.ljyh.mei.constants.SDeviceIdKey
+import com.ljyh.mei.constants.UserIdKey
+import com.ljyh.mei.constants.UserAvatarUrlKey
+import com.ljyh.mei.constants.UserNicknameKey
 import com.ljyh.mei.data.model.melox.CloudMusicPage
 import com.ljyh.mei.data.model.melox.CloudSong
 import com.ljyh.mei.data.model.melox.ListenTogetherCommand
@@ -50,14 +69,22 @@ import com.ljyh.mei.data.model.melox.AccountProfile
 import com.ljyh.mei.data.model.melox.AccountSong
 import com.ljyh.mei.data.model.melox.UserPlayRecord
 import com.ljyh.mei.data.network.api.MeloXDirectService
-import com.ljyh.mei.constants.CookieKey
+import com.ljyh.mei.data.network.NeteaseLoginSecurity
+import com.ljyh.mei.data.network.readNeteaseLoginCookies
+import com.ljyh.mei.data.network.NeteaseSessionType
+import com.ljyh.mei.data.network.neteaseSessionType
+import com.ljyh.mei.data.network.requireNeteaseMobileSession
+import com.ljyh.mei.constants.NeteaseSessionTypeKey
+import com.ljyh.mei.di.NETEASE_WEB_SESSION_HEADER
+import com.ljyh.mei.data.network.NeteaseOfficialDeviceId
+import com.ljyh.mei.data.network.NeteaseUrsSmsLogin
+import com.ljyh.mei.utils.dataStore
 import com.ljyh.mei.constants.DebugKey
 import com.ljyh.mei.di.MAX_PLAYBACK_HISTORY_RESPONSE_BYTES
 import com.ljyh.mei.di.NETEASE_EAPI_PROFILE_HEADER
 import com.ljyh.mei.di.PLAYBACK_HISTORY_PROFILE
 import com.ljyh.mei.di.PlaybackResponseBodyException
 import com.ljyh.mei.di.readBoundedPlaybackResponseBody
-import com.ljyh.mei.utils.dataStore
 import com.ljyh.mei.utils.log.logPlaybackHistory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -73,7 +100,9 @@ import okhttp3.ResponseBody
 import okio.BufferedSink
 import okio.source
 import org.json.JSONObject
+import timber.log.Timber
 import java.security.MessageDigest
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
@@ -101,6 +130,8 @@ class MeloXRepository @Inject constructor(
     @Named("MeloXWeapi") private val weapi: MeloXDirectService,
     @ApplicationContext private val context: Context,
     @Named("CloudUploadClient") private val cloudUploadClient: OkHttpClient,
+    private val neteaseLoginSecurity: NeteaseLoginSecurity,
+    private val neteaseUrsSmsLogin: NeteaseUrsSmsLogin,
 ) {
     suspend fun podcastHome(): PodcastHome = coroutineScope {
         val categories = async {
@@ -136,6 +167,14 @@ class MeloXRepository @Inject constructor(
                 totalCount = programs.totalCount,
             )
         }
+
+    suspend fun podcastProgram(id: Long): PodcastProgram {
+        require(id > 0) { "Invalid podcast program ID" }
+        return parsePodcastProgramDetail(
+            request("/api/dj/program/detail", mapOf("id" to id)),
+            id,
+        )
+    }
 
     suspend fun podcastPrograms(id: Long, offset: Int = 0, limit: Int = 50): PodcastProgramPage {
         val response = request(
@@ -187,14 +226,397 @@ class MeloXRepository @Inject constructor(
         return SearchDiscovery(recommendations)
     }
 
-    suspend fun accountProfile(): AccountProfile {
-        val response = runCatching { requestEapi("/api/w/nuser/account/get") }
+    suspend fun accountProfile(webCookie: String? = null): AccountProfile {
+        suspend fun profileRequest(path: String): JsonObject = if (webCookie == null) {
+            requestEapi(path)
+        } else {
+            validate(eapi.post(
+                path = path.replaceFirst("/api/", "/eapi/"),
+                headers = mapOf(NETEASE_WEB_SESSION_HEADER to webCookie),
+            ))
+        }
+        val response = runCatching { profileRequest("/api/w/nuser/account/get") }
             .getOrElse { error ->
                 if (error is kotlinx.coroutines.CancellationException) throw error
-                requestEapi("/api/nuser/account/get")
+                profileRequest("/api/nuser/account/get")
             }
         return parseAccountProfile(response.objectOrNull("profile"))
             ?: error("NetEase account profile is unavailable")
+    }
+
+    suspend fun loginWithMobilePassword(
+        phone: String,
+        countryCode: String,
+        password: String,
+    ): AccountProfile {
+        val (normalizedPhone, normalizedCountryCode) = normalizeMobileAccount(phone, countryCode)
+        require(password.isNotEmpty()) { "Password is required" }
+        val passwordMd5 = MessageDigest.getInstance("MD5")
+            .digest(password.toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte ->
+                (byte.toInt() and 0xff).toString(16).padStart(2, '0')
+            }
+
+        return loginWithMobileCredentials { checkToken ->
+            linkedMapOf(
+                "phone" to normalizedPhone,
+                "countrycode" to normalizedCountryCode,
+                "password" to passwordMd5,
+                "secureCaptcha" to "",
+                "nonce" to UUID.randomUUID().toString(),
+                "checkToken" to checkToken,
+            )
+        }
+    }
+
+    suspend fun requestMobileSmsCode(
+        activity: Activity,
+        phone: String,
+        countryCode: String,
+    ) {
+        val (normalizedPhone, normalizedCountryCode) = normalizeMobileAccount(phone, countryCode)
+        neteaseUrsSmsLogin.requestCode(activity, normalizedPhone, normalizedCountryCode)
+    }
+
+    suspend fun loginWithMobileSms(
+        phone: String,
+        countryCode: String,
+        code: String,
+    ): AccountProfile {
+        val (normalizedPhone, normalizedCountryCode) = normalizeMobileAccount(phone, countryCode)
+        val normalizedCode = code.trim()
+        require(normalizedCode.length in 4..8 && normalizedCode.all(Char::isDigit)) {
+            "Invalid SMS verification code"
+        }
+        val credentials = neteaseUrsSmsLogin.verifyCode(
+            normalizedPhone,
+            normalizedCountryCode,
+            normalizedCode,
+        )
+        return loginWithUrsCredentials(credentials)
+    }
+
+    suspend fun loginWithUpSms(challenge: com.ljyh.mei.data.network.NeteaseUrsUpSmsChallenge): AccountProfile =
+        loginWithUrsCredentials(neteaseUrsSmsLogin.verifyUpSms(challenge))
+
+    private suspend fun loginWithUrsCredentials(credentials: com.ljyh.mei.data.network.NeteaseUrsLoginCredentials): AccountProfile =
+        loginWithMobileCredentials(ursAppId = credentials.appId) { checkToken ->
+            linkedMapOf(
+                "ursToken" to credentials.token,
+                "nonce" to UUID.randomUUID().toString(),
+                "checkToken" to checkToken,
+            )
+        }
+
+    private suspend fun loginWithMobileCredentials(
+        ursAppId: String? = null,
+        body: (checkToken: String) -> Map<String, Any>,
+    ): AccountProfile {
+        val loginUrsAppId = ursAppId ?: neteaseUrsSmsLogin.appId()
+        val ydDeviceToken = prepareNeteaseLoginDevice()
+        val deviceId = context.dataStore.data.first()[DeviceIdKey].orEmpty()
+        check(deviceId.isNotBlank()) { "NetEase official device identity is unavailable" }
+        val loginChainId = "v1_${deviceId}_android_login_${System.currentTimeMillis()}"
+        val checkToken = neteaseLoginSecurity.pcQrCheckToken()
+        val headerAntiCheatToken = neteaseLoginSecurity.freshCheckToken()
+        val securityCookies = neteaseLoginSecurity.securityCookies()
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Mobile login context ready loginChainId=${loginChainId.length} " +
+                "ursAppId=${loginUrsAppId.length} transport=eapi",
+        )
+        // 3.7.30 uses the ordinary EAPI login route. It does not depend on a
+        // banner request negotiating an unrelated AEAPI session first.
+        val response = eapi.postResponse(
+            path = "/api/login/cellphone",
+            body = body(checkToken),
+            cryptoMode = "eapi",
+            antiCheatToken = headerAntiCheatToken,
+            ydDeviceToken = ydDeviceToken,
+            loginChainId = loginChainId,
+            nmcid = securityCookies.nmcid,
+            nmdi = securityCookies.nmdi,
+            nmtid = securityCookies.nmtid.takeIf(String::isNotBlank),
+            withoutAccount = true,
+            ursAppId = loginUrsAppId,
+        )
+        val responseBody = response.body()
+        val code = responseBody?.int("code") ?: response.code()
+        if (!response.isSuccessful || code !in 200..299 || responseBody == null) {
+            Log.w(
+                PC_QR_LOG_TAG,
+                "Mobile login rejected http=${response.code()} code=$code " +
+                    "body=${responseBody != null}",
+            )
+            throw NeteaseMobileLoginException(
+                code = code,
+                message = responseBody?.string("message")
+                    ?: responseBody?.string("msg")
+                    ?: "NetEase mobile login failed ($code)",
+            )
+        }
+        val session = readNeteaseLoginCookies(response.raw())
+        val (musicU, csrf, musicA, refreshToken) = session
+        val profile = parseAccountProfile(responseBody.objectOrNull("profile"))
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Mobile login session fields musicU=${musicU.isNotBlank()} musicA=${musicA != null} " +
+                "csrf=${csrf.isNotBlank()} refreshToken=${refreshToken != null} " +
+                "profile=${profile?.id?.let { it > 0 } == true}",
+        )
+        check(
+            profile != null && profile.id > 0
+        ) {
+            "NetEase mobile login returned an incomplete account session"
+        }
+        context.dataStore.edit { preferences ->
+            preferences[CookieKey] = musicU
+            preferences[NeteaseSessionTypeKey] = NeteaseSessionType.Mobile.name
+            preferences[NeteaseCsrfKey] = csrf
+            preferences[NeteaseUrsAppIdKey] = loginUrsAppId
+            if (musicA == null) preferences.remove(NeteaseMusicAKey)
+            else preferences[NeteaseMusicAKey] = musicA
+            // Some supported clients do not receive a refresh token. MUSIC_U is
+            // the authenticated session; a missing refresh token is not a failure.
+            if (refreshToken == null) preferences.remove(NeteaseRefreshTokenKey)
+            else preferences[NeteaseRefreshTokenKey] = refreshToken
+            preferences[UserIdKey] = profile.id.toString()
+            preferences[UserNicknameKey] = profile.nickname
+            if (profile.avatarUrl == null) preferences.remove(UserAvatarUrlKey)
+            else preferences[UserAvatarUrlKey] = profile.avatarUrl
+        }
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Mobile account session ready musicU=${musicU.length} csrf=${csrf.length} " +
+                "musicA=${musicA?.length ?: 0} refreshToken=${refreshToken?.length ?: 0}",
+        )
+        return profile
+    }
+
+    private fun normalizeMobileAccount(phone: String, countryCode: String): Pair<String, String> {
+        val normalizedPhone = phone.trim()
+        val normalizedCountryCode = countryCode.trim().removePrefix("+")
+        require(normalizedPhone.length in 5..20 && normalizedPhone.all(Char::isDigit)) {
+            "Invalid mobile number"
+        }
+        require(normalizedCountryCode.length in 1..4 && normalizedCountryCode.all(Char::isDigit)) {
+            "Invalid country code"
+        }
+        return normalizedPhone to normalizedCountryCode
+    }
+
+    suspend fun preparePcQrLoginSecurity() {
+        val preferences = context.dataStore.data.first()
+        preferences.requireNeteaseMobileSession()
+        check(!preferences[CookieKey].isNullOrBlank()) { "NetEase account is not signed in" }
+        check(preferences[UserIdKey]?.toLongOrNull()?.let { it > 0 } == true) {
+            "NetEase account user ID is unavailable"
+        }
+        prepareNeteaseLoginDevice()
+    }
+
+    internal suspend fun prepareNeteaseLoginDevice(): String {
+        ensureOfficialDeviceIdentity()
+        val ydDeviceToken = neteaseLoginSecurity.prepareForPcQrLogin()
+        ensureNeteaseDeviceRegistered(ydDeviceToken)
+        return ydDeviceToken
+    }
+
+    suspend fun markPcQrScanned(key: String, clientTraceId: String?): String =
+        submitPcQrLoginAction(key, clientTraceId, PcQrLoginAction.Scan)
+            .string("platform")
+            .orEmpty()
+
+    suspend fun authorizePcQrLogin(key: String, clientTraceId: String?) {
+        submitPcQrLoginAction(key, clientTraceId, PcQrLoginAction.Authorize)
+    }
+
+    suspend fun cancelPcQrLogin(key: String, clientTraceId: String?) {
+        submitPcQrLoginAction(key, clientTraceId, PcQrLoginAction.Cancel)
+    }
+
+    private suspend fun submitPcQrLoginAction(
+        key: String,
+        clientTraceId: String?,
+        action: PcQrLoginAction,
+    ): JsonObject {
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Action start action=${action.name} trace=${!clientTraceId.isNullOrBlank()}",
+        )
+        val preferences = context.dataStore.data.first()
+        preferences.requireNeteaseMobileSession()
+        check(!preferences[CookieKey].isNullOrBlank()) { "NetEase account is not signed in" }
+        val userId = preferences[UserIdKey]?.toLongOrNull()?.takeIf { it > 0 }
+            ?: error("NetEase account user ID is unavailable")
+        ensureOfficialDeviceIdentity()
+        val ydDeviceToken = neteaseLoginSecurity.ydDeviceToken()
+        ensureNeteaseDeviceRegistered(ydDeviceToken)
+        val checkToken = neteaseLoginSecurity.pcQrCheckToken()
+        val headerAntiCheatToken = neteaseLoginSecurity.freshCheckToken()
+        val securityCookies = neteaseLoginSecurity.securityCookies()
+        val response = try {
+            eapi.post(
+                path = "/api/login/qrcode/server/login",
+                body = buildPcQrLoginBody(
+                    key = key,
+                    clientTraceId = clientTraceId,
+                    userId = userId,
+                    action = action,
+                    antiCheatToken = checkToken,
+                ),
+                cryptoMode = "eapi",
+                antiCheatToken = headerAntiCheatToken,
+                ydDeviceToken = ydDeviceToken,
+                nmcid = securityCookies.nmcid,
+                nmdi = securityCookies.nmdi,
+                nmtid = securityCookies.nmtid.takeIf(String::isNotBlank),
+            )
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            Log.e(
+                PC_QR_LOG_TAG,
+                "Request failed action=${action.name} security={checkToken:${checkToken.length}," +
+                    "antiCheatToken:${headerAntiCheatToken.length},ydDeviceToken:${ydDeviceToken.length},eapi:true}",
+                error,
+            )
+            Timber.tag(PC_QR_LOG_TAG).e(
+                error,
+                "Request failed action=%s security={antiCheat:%d,yd:%d,eapi:true}",
+                action.name,
+                checkToken.length,
+                ydDeviceToken.length,
+            )
+            throw error
+        }
+        val code = response.int("code") ?: 0
+        val message = response.string("message") ?: response.string("msg")
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Response action=${action.name} code=$code message=${message.orEmpty()} " +
+                "security={checkToken:${checkToken.length},antiCheatToken:${headerAntiCheatToken.length}," +
+                "ydDeviceToken:${ydDeviceToken.length},eapi:true}",
+        )
+        Timber.tag(PC_QR_LOG_TAG).i(
+            "Response action=%s code=%d message=%s security={antiCheat:%d,yd:%d,eapi:true}",
+            action.name,
+            code,
+            message.orEmpty(),
+            checkToken.length,
+            ydDeviceToken.length,
+        )
+        if (code != 200) {
+            throw PcQrLoginException(
+                code = code,
+                message = message ?: "NetEase PC QR login failed ($code)",
+            )
+        }
+        return response
+    }
+
+    private suspend fun ensureOfficialDeviceIdentity() {
+        val current = context.dataStore.data.first()
+        if (
+            current[NeteaseSecurityIdentityKey] == NETEASE_SECURITY_IDENTITY &&
+            !current[DeviceIdKey].isNullOrBlank()
+        ) {
+            Log.i(
+                PC_QR_LOG_TAG,
+                "Official device identity reused length=${current[DeviceIdKey]?.length ?: 0}",
+            )
+            return
+        }
+        val fallbackLocalId = current[NeteaseLocalDeviceIdKey]
+            ?.takeIf { it.length == NETEASE_LOCAL_ID_LENGTH }
+            ?: UUID.randomUUID().toString().replace("-", "").take(NETEASE_LOCAL_ID_LENGTH)
+        val identity = withContext(Dispatchers.IO) {
+            NeteaseOfficialDeviceId.create(context, fallbackLocalId)
+        }
+        check(identity.encoded.isNotBlank()) { "NetEase official device ID is unavailable" }
+        val wasRegistered = !current[SDeviceIdKey].isNullOrBlank()
+        context.dataStore.edit { settings ->
+            settings[DeviceIdKey] = identity.encoded
+            settings[NeteaseLocalDeviceIdKey] = fallbackLocalId
+            if (
+                wasRegistered &&
+                current[NeteaseDeviceRegisteredModelKey].isNullOrBlank()
+            ) {
+                settings[NeteaseDeviceRegisteredModelKey] = Build.MODEL
+            }
+            settings.remove(SDeviceIdKey)
+            settings.remove(NeteaseSecurityIdentityKey)
+        }
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Official device identity ready length=${identity.encoded.length} " +
+                "fields={wifi:${identity.wifiLength},android:${identity.androidIdLength}," +
+                "local:${identity.localIdLength},fallback:${identity.usedLocalIdFallback}}",
+        )
+    }
+
+    private suspend fun ensureNeteaseDeviceRegistered(ydDeviceToken: String) {
+        val current = context.dataStore.data.first()
+        if (
+            !current[SDeviceIdKey].isNullOrBlank() &&
+            current[NeteaseSecurityIdentityKey] == NETEASE_SECURITY_IDENTITY
+        ) {
+            Log.i(
+                PC_QR_LOG_TAG,
+                "Device fingerprint registration reused deviceId=${current[DeviceIdKey]?.length ?: 0} " +
+                    "sDeviceId=${current[SDeviceIdKey]?.length ?: 0}",
+            )
+            return
+        }
+        val registeredModel = current[NeteaseDeviceRegisteredModelKey].orEmpty()
+        val initType = when {
+            registeredModel.isBlank() -> 1
+            registeredModel == Build.MODEL -> 0
+            else -> 2
+        }
+        val androidId = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ANDROID_ID,
+        ).orEmpty()
+        val response = eapi.post(
+            path = "/api/middle/device-info/get?ydDeviceType=Android&ydDeviceToken=$ydDeviceToken",
+            body = mapOf(
+                "ydDeviceType" to "Android",
+                "ydDeviceToken" to ydDeviceToken,
+                "initType" to initType,
+                "imei" to "null",
+                "androidId" to androidId,
+                "oaid" to "",
+            ),
+            cryptoMode = "eapi",
+        )
+        val code = response.int("code") ?: 0
+        val data = response.objectOrNull("data")
+        val sDeviceId = data?.string("sDeviceId").orEmpty()
+        val correctDeviceId = data?.string("correctDeviceId").orEmpty()
+        val initializesFromServer = data?.boolean("initAppBySDeviceId") == true
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Device fingerprint registration code=$code initType=$initType " +
+                "sDeviceId=${sDeviceId.length} correctDeviceId=${correctDeviceId.length} " +
+                "initialize=$initializesFromServer",
+        )
+        check(code == 200 && sDeviceId.isNotBlank()) {
+            response.string("message")
+                ?: response.string("msg")
+                ?: "NetEase device fingerprint registration failed ($code)"
+        }
+        context.dataStore.edit { settings ->
+            settings[SDeviceIdKey] = sDeviceId
+            settings[NeteaseSecurityIdentityKey] = NETEASE_SECURITY_IDENTITY
+            settings[NeteaseDeviceRegisteredModelKey] = Build.MODEL
+            if (initializesFromServer) settings[DeviceIdKey] = sDeviceId
+        }
+        Log.i(
+            PC_QR_LOG_TAG,
+            "Device fingerprint identity active deviceId=${
+                if (initializesFromServer) sDeviceId.length else current[DeviceIdKey]?.length ?: 0
+            } sDeviceId=${sDeviceId.length}",
+        )
     }
 
     suspend fun accountDetail(userId: Long): AccountDetail {
@@ -212,7 +634,7 @@ class MeloXRepository @Inject constructor(
         return AccountDetail(
             profile = profile,
             level = response.int("level") ?: 0,
-            listenSongs = response.int("listenSongs") ?: 0,
+            listenSongs = response.int("listenSongs")?.takeIf { it >= 0 },
             createDays = response.int("createDays"),
         )
     }
@@ -228,9 +650,7 @@ class MeloXRepository @Inject constructor(
             "/api/v1/play/record",
             mapOf("uid" to userId, "type" to if (allTime) 0 else 1),
         )
-        return response.array(if (allTime) "allData" else "weekData")
-            .mapNotNull(::parseUserPlayRecord)
-            .filter { it.song.id > 0 }
+        return parseUserPlayRecords(response, allTime)
     }
 
     suspend fun recentSongs(limit: Int = 100): List<AccountSong> {
@@ -253,13 +673,15 @@ class MeloXRepository @Inject constructor(
         startedAtMs: Long,
     ): PlaybackLogResponse? {
         if (songId <= 0L) return null
-        val debugEnabled = authenticatedPlaybackHistoryDebugEnabled() ?: return null
+        val preferences = authenticatedPlaybackHistoryPreferences() ?: return null
+        val debugEnabled = BuildConfig.DEBUG || preferences[DebugKey] == true
 
         return submitPlaybackHistoryStart(
             songId = songId,
             sourceId = sourceId,
             source = source,
             startedAtMs = startedAtMs,
+            isMobileSession = preferences.neteaseSessionType() == NeteaseSessionType.Mobile,
         ) { action, fields ->
             submitPlaybackHistoryLog(eapi, action, fields).also { response ->
                 logPlaybackHistoryDebug(action, fields, response, debugEnabled)
@@ -277,7 +699,8 @@ class MeloXRepository @Inject constructor(
         endReason: String,
     ): PlaybackLogResponse? {
         if (songId <= 0L) return null
-        val debugEnabled = authenticatedPlaybackHistoryDebugEnabled() ?: return null
+        val preferences = authenticatedPlaybackHistoryPreferences() ?: return null
+        val debugEnabled = BuildConfig.DEBUG || preferences[DebugKey] == true
         val fields = playbackHistoryPlayFields(
             songId = songId,
             sourceId = sourceId,
@@ -286,16 +709,17 @@ class MeloXRepository @Inject constructor(
             startedAtMs = startedAtMs,
             endedAtMs = endedAtMs,
             endReason = endReason,
+            isMobileSession = preferences.neteaseSessionType() == NeteaseSessionType.Mobile,
         )
         return submitPlaybackHistoryLog(eapi, "play", fields).also { response ->
             logPlaybackHistoryDebug("play", fields, response, debugEnabled)
         }
     }
 
-    private suspend fun authenticatedPlaybackHistoryDebugEnabled(): Boolean? {
+    private suspend fun authenticatedPlaybackHistoryPreferences(): Preferences? {
         val preferences = context.dataStore.data.first()
         if (preferences[CookieKey].isNullOrBlank()) return null
-        return BuildConfig.DEBUG || preferences[DebugKey] == true
+        return preferences
     }
 
     private fun logPlaybackHistoryDebug(
@@ -586,9 +1010,7 @@ class MeloXRepository @Inject constructor(
             "/api/song/play/about/block/page",
             mapOf("songId" to songId),
         )
-        val blocks = response.objectOrNull("data")?.array("blocks")
-            .orEmpty()
-            .mapNotNull { it.objectValue() }
+        val blocks = parseSongWikiBlocks(response)
         val basicBlockCodes = setOf(
             "SONG_PLAY_ABOUT_SONG_BASIC",
             "SONG_PLAY_ABOUT_MUSIC_SONG_GRADE",
@@ -647,29 +1069,7 @@ class MeloXRepository @Inject constructor(
                 }
         }
 
-        val memories = blocks
-            .filter { it.string("code") == "SONG_PLAY_ABOUT_MUSIC_MEMORY" }
-            .flatMap(JsonObject::blockResources)
-            .mapIndexedNotNull { index, resource ->
-                val extension = resource.objectOrNull("resourceExt")
-                    ?: resource.objectOrNull("resourceExtInfo")
-                when (resource.string("resourceType")?.uppercase()) {
-                    "FIRST_LISTEN" -> extension?.objectOrNull("musicFirstListenDto")
-                        ?.string("date")?.nonEmpty()?.let {
-                            SongWikiMemoryItem("first-listen-$index", SongWikiMemoryKind.FirstListen, date = it)
-                        }
-                    "TOTAL_PLAY" -> extension?.objectOrNull("musicTotalPlayDto")?.let { total ->
-                        SongWikiMemoryItem(
-                            id = "total-play-$index",
-                            kind = SongWikiMemoryKind.TotalPlay,
-                            playCount = total.long("playCount"),
-                            durationMinutes = total.long("duration"),
-                            text = total.string("text")?.nonEmpty(),
-                        ).takeIf { it.playCount != null || it.durationMinutes != null || it.text != null }
-                    }
-                    else -> null
-                }
-            }
+        val memories = parseSongListeningMemories(blocks)
 
         val similarSongs = blocks
             .filter { it.string("code") == "SONG_PLAY_ABOUT_SIMILAR_SONG" }
@@ -878,6 +1278,40 @@ class MeloXRepository @Inject constructor(
 
 }
 
+internal enum class PcQrLoginAction(val wireValue: String) {
+    Scan("1"),
+    Authorize("2"),
+    Cancel("3"),
+}
+
+internal fun buildPcQrLoginBody(
+    key: String,
+    clientTraceId: String?,
+    userId: Long,
+    action: PcQrLoginAction,
+    antiCheatToken: String,
+): Map<String, Any> = buildMap {
+    put("key", key)
+    put("type", action.wireValue)
+    put("userid", userId.toString())
+    put("checkToken", antiCheatToken)
+    clientTraceId?.takeIf(String::isNotBlank)?.let { put("clientTraceId", it) }
+}
+
+class PcQrLoginException(
+    val code: Int,
+    message: String,
+) : IllegalStateException(message)
+
+class NeteaseMobileLoginException(
+    val code: Int,
+    message: String,
+) : IllegalStateException(message)
+
+private const val PC_QR_LOG_TAG = "PcQrLogin"
+private const val NETEASE_SECURITY_IDENTITY = "official-9.5.70-v4"
+private const val NETEASE_LOCAL_ID_LENGTH = 16
+
 internal data class PlaybackBodyParseResult(
     val code: Int?,
     val message: String?,
@@ -943,13 +1377,14 @@ internal suspend fun submitPlaybackHistoryStart(
     sourceId: Long,
     source: String,
     startedAtMs: Long,
+    isMobileSession: Boolean = false,
     submit: suspend (String, Map<String, Any>) -> PlaybackLogResponse,
 ): PlaybackLogResponse {
     require(songId > 0L) { "songId must be positive" }
     // A play event closes a session; sending play(time=0) here creates a false completion.
     return submit(
         "startplay",
-        playbackHistoryBaseFields(songId, sourceId, source, startedAtMs, startedAtMs),
+        playbackHistoryBaseFields(songId, sourceId, source, startedAtMs, startedAtMs, isMobileSession),
     )
 }
 
@@ -961,7 +1396,8 @@ internal fun playbackHistoryPlayFields(
     startedAtMs: Long,
     endedAtMs: Long,
     endReason: String,
-): Map<String, Any> = playbackHistoryBaseFields(songId, sourceId, source, startedAtMs, endedAtMs) + mapOf(
+    isMobileSession: Boolean = false,
+): Map<String, Any> = playbackHistoryBaseFields(songId, sourceId, source, startedAtMs, endedAtMs, isMobileSession) + mapOf(
     "download" to 0,
     "end" to endReason,
     "time" to timeSeconds.coerceAtLeast(0L),
@@ -974,6 +1410,7 @@ private fun playbackHistoryBaseFields(
     source: String,
     startedAtMs: Long,
     loggedAtMs: Long,
+    isMobileSession: Boolean,
 ): Map<String, Any> {
     require(songId > 0L) { "songId must be positive" }
     val knownSource = source.takeIf { it in PLAYBACK_SOURCES }
@@ -990,10 +1427,8 @@ private fun playbackHistoryBaseFields(
         "sourceId" to safeSourceId.toString(),
         "source" to safeSource,
         "sourcetype" to safeSource,
-        "mainsite" to "1",
-        "mainsiteWeb" to "1",
         "content" to "id=$safeSourceId",
-    )
+    ) + if (isMobileSession) emptyMap() else mapOf("mainsite" to "1", "mainsiteWeb" to "1")
 }
 
 internal fun parsePlaybackHistoryBody(body: String?): PlaybackBodyParseResult {
@@ -1209,6 +1644,41 @@ private fun JsonObject.blockResources(): List<JsonObject> = array("creatives")
     .flatMap { it.array("resources") }
     .mapNotNull { it.objectValue() }
 
+internal fun parseSongWikiBlocks(response: JsonObject): List<JsonObject> {
+    check(response.int("code") == 200) {
+        response.string("message") ?: response.string("msg") ?: "Song information is unavailable"
+    }
+    val data = response.element("data") ?: return emptyList()
+    check(data.isJsonObject) { "Song information is unavailable" }
+    val blocks = data.asJsonObject.element("blocks") ?: return emptyList()
+    check(blocks.isJsonArray) { "Song information is unavailable" }
+    return blocks.asJsonArray.mapNotNull(JsonElement::objectValue)
+}
+
+internal fun parseSongListeningMemories(blocks: List<JsonObject>): List<SongWikiMemoryItem> = blocks
+    .filter { it.string("code") == "SONG_PLAY_ABOUT_MUSIC_MEMORY" }
+    .flatMap(JsonObject::blockResources)
+    .mapIndexedNotNull { index, resource ->
+        val extension = resource.objectOrNull("resourceExt")
+            ?: resource.objectOrNull("resourceExtInfo")
+        when (resource.string("resourceType")?.uppercase()) {
+            "FIRST_LISTEN" -> extension?.objectOrNull("musicFirstListenDto")
+                ?.string("date")?.nonEmpty()?.let {
+                    SongWikiMemoryItem("first-listen-$index", SongWikiMemoryKind.FirstListen, date = it)
+                }
+            "TOTAL_PLAY" -> extension?.objectOrNull("musicTotalPlayDto")?.let { total ->
+                SongWikiMemoryItem(
+                    id = "total-play-$index",
+                    kind = SongWikiMemoryKind.TotalPlay,
+                    playCount = total.long("playCount")?.takeIf { it >= 0 },
+                    durationMinutes = total.long("duration")?.takeIf { it > 0 },
+                    text = total.string("text")?.nonEmpty(),
+                ).takeIf { it.playCount != null || it.durationMinutes != null || it.text != null }
+            }
+            else -> null
+        }
+    }
+
 private fun JsonObject?.mainTitle(): String? = this?.objectOrNull("mainTitle")
     ?.string("title")?.nonEmpty()
 
@@ -1282,6 +1752,14 @@ private fun parsePodcast(element: JsonElement?): Podcast? {
         isSubscribed = value.boolean("subed") ?: false,
         feeType = value.int("radioFeeType"),
     )
+}
+
+internal fun parsePodcastProgramDetail(response: JsonObject, requestedId: Long): PodcastProgram {
+    val program = parseProgram(response.get("program"))
+    check(program != null && program.id == requestedId && (program.mainSongId ?: 0L) > 0L) {
+        "Playable podcast program $requestedId was not returned by NetEase"
+    }
+    return program
 }
 
 private fun parseProgram(element: JsonElement?): PodcastProgram? {
@@ -1403,12 +1881,21 @@ private fun parseAccountSong(value: JsonObject?): AccountSong? = value?.let {
     )
 }
 
-private fun parseUserPlayRecord(element: JsonElement?): UserPlayRecord? {
+internal fun parseUserPlayRecords(response: JsonObject, allTime: Boolean): List<UserPlayRecord> {
+    check(response.int("code") == 200) {
+        response.string("message") ?: response.string("msg") ?: "Listening statistics are unavailable"
+    }
+    val data = response.element(if (allTime) "allData" else "weekData")
+    check(data?.isJsonArray == true) { "Listening statistics are unavailable" }
+    return data.asJsonArray.mapNotNull(::parseUserPlayRecord).filter { it.song.id > 0 }
+}
+
+internal fun parseUserPlayRecord(element: JsonElement?): UserPlayRecord? {
     val value = element?.takeIf(JsonElement::isJsonObject)?.asJsonObject ?: return null
     val song = parseAccountSong(value.objectOrNull("song")) ?: return null
     return UserPlayRecord(
         song = song,
-        playCount = value.int("playCount") ?: 0,
+        playCount = value.int("playCount")?.takeIf { it >= 0 },
         score = value.int("score"),
     )
 }
