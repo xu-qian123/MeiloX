@@ -28,6 +28,7 @@ import com.ljyh.mei.di.dao.HistoryDao
 import com.ljyh.mei.di.dao.LikeDao
 import com.ljyh.mei.di.dao.SongDao
 import com.ljyh.mei.utils.color.CoverBrightness
+import com.ljyh.mei.utils.color.CoverSurfaceColor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -41,12 +42,34 @@ import javax.inject.Singleton
 @Singleton
 class ColorRepository @Inject constructor(private val colorDao: ColorDao) {
     private val memoryCache = ConcurrentHashMap<String, Color>()
+    private val surfaceColorCache = ConcurrentHashMap<String, Color>()
     private val coverBrightnessCache = ConcurrentHashMap<String, Boolean>()
 
     fun getFromMemory(url: String): Color? {
         if (url.isEmpty()) return null
         return memoryCache[themeColorCacheKey(url)]
     }
+
+    fun getCachedSurfaceColor(url: String): Color? =
+        surfaceColorCache["cover-surface-lower-v1:$url"]
+
+    suspend fun getSurfaceColorOrExtract(context: Context, url: String): Color? =
+        withContext(Dispatchers.IO) {
+            if (url.isBlank()) return@withContext null
+            val key = "cover-surface-lower-v1:$url"
+            surfaceColorCache[key]?.let { return@withContext it }
+            colorDao.getColor(key)?.let {
+                return@withContext Color(it.color).also { color -> surfaceColorCache[key] = color }
+            }
+            val bitmap = loadCoverBitmap(context, url) ?: return@withContext null
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            val color = CoverSurfaceColor.extract(pixels, bitmap.width, bitmap.height)
+                ?.let { Color(it) } ?: return@withContext null
+            colorDao.insertColor(CacheColor(url = key, color = color.toArgb()))
+            surfaceColorCache[key] = color
+            color
+        }
 
     fun getCachedCoverIsDark(url: String): Boolean? {
         if (url.isEmpty()) return null

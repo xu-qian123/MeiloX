@@ -31,10 +31,10 @@ class ArtistViewModel internal constructor(
         colorRepository: ColorRepository,
     ) : this(repository, colorRepository, meloXRepository::setArtistFollowed)
 
-    fun getCachedColor(url: String) = colorRepository.getFromMemory(url)
+    fun getCachedColor(url: String) = colorRepository.getCachedSurfaceColor(url)
 
     suspend fun getOrExtractColor(url: String) =
-        colorRepository.getColorOrExtract(AppContext.instance, url)
+        colorRepository.getSurfaceColorOrExtract(AppContext.instance, url)
 
     fun getCachedCoverIsDark(url: String) = colorRepository.getCachedCoverIsDark(url)
 

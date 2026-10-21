@@ -38,19 +38,19 @@ data class CoverBackground(
 fun rememberCoverBackground(
     coverUrl: String,
     getCachedColor: (String) -> Color?,
-    getOrExtractColor: suspend (String) -> Color,
+    getOrExtractColor: suspend (String) -> Color?,
     ownerKey: Any? = Unit,
 ): CoverBackground {
     val colors = LocalGlassColors.current
     val currentGetCachedColor by rememberUpdatedState(getCachedColor)
     val currentGetOrExtractColor by rememberUpdatedState(getOrExtractColor)
     var coverColor by remember(ownerKey, coverUrl) {
-        mutableStateOf(currentGetCachedColor(coverUrl)?.takeUnless { it == Color.Black })
+        mutableStateOf(currentGetCachedColor(coverUrl))
     }
     LaunchedEffect(ownerKey, coverUrl) {
         if (coverUrl.isBlank()) return@LaunchedEffect
         try {
-            coverColor = currentGetOrExtractColor(coverUrl).takeUnless { it == Color.Black }
+            coverColor = currentGetOrExtractColor(coverUrl)
         } catch (cause: CancellationException) {
             throw cause
         } catch (_: Exception) {

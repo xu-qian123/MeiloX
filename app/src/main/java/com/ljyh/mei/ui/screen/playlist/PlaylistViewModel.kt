@@ -60,10 +60,10 @@ class PlaylistViewModel @Inject constructor(
     val apiService: ApiService
 ) : ViewModel() {
 
-    fun getCachedColor(url: String) = colorRepository.getFromMemory(url)
+    fun getCachedColor(url: String) = colorRepository.getCachedSurfaceColor(url)
 
     suspend fun getOrExtractColor(url: String) =
-        colorRepository.getColorOrExtract(AppContext.instance, url)
+        colorRepository.getSurfaceColorOrExtract(AppContext.instance, url)
 
     private val _playlistDetail = MutableStateFlow<Resource<PlaylistDetail>>(Resource.Loading)
     val playlistDetail: StateFlow<Resource<PlaylistDetail>> = _playlistDetail
