@@ -7,6 +7,24 @@ import org.junit.Test
 
 class PlayerActionTest {
     @Test
+    fun `comments are inserted before more and migration is idempotent`() {
+        val migrated = PlayerAction.migrateMissingComments("mode,queue,lyrics,more")
+        assertEquals("mode,queue,lyrics,comment,more", migrated)
+        assertNull(PlayerAction.migrateMissingComments(migrated!!))
+    }
+
+    @Test
+    fun `full custom toolbar keeps its selected actions`() {
+        assertNull(PlayerAction.migrateMissingComments("mode,queue,sleep,download,more"))
+    }
+
+    @Test
+    fun `default toolbar includes comments within visible limit`() {
+        assertTrue(PlayerAction.COMMENTS in PlayerAction.defaultActions)
+        assertTrue(PlayerAction.defaultActions.size <= PlayerAction.MAX_VISIBLE)
+    }
+
+    @Test
     fun `default toolbar already contains the more action`() {
         assertTrue(PlayerAction.defaultActions.contains(PlayerAction.MORE))
         assertNull(PlayerAction.migrateMissingMore(PlayerAction.toSettings(PlayerAction.defaultActions)))

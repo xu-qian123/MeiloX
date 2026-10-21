@@ -18,6 +18,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.shadow.Shadow
@@ -84,7 +90,7 @@ fun PlaylistHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 4.dp, vertical = 16.dp),
+            .padding(bottom = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         PlaylistCover(
@@ -100,7 +106,7 @@ fun PlaylistHeader(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 22.dp).padding(horizontal = 20.dp),
+            modifier = Modifier.padding(top = 8.dp).padding(horizontal = 20.dp),
         )
         if (creator.isNotBlank()) {
             Text(
@@ -143,6 +149,7 @@ fun PlaylistHeader(
             }
             GlassButton(
                 onClick = onPlayAll,
+                modifier = Modifier.widthIn(min = 128.dp),
                 style = GlassSurfaceStyle.Navigation,
                 enabled = count > 0,
                 emphasis = GlassEmphasis.Prominent,
@@ -198,21 +205,32 @@ private fun PlaylistCover(
     cover: String,
     coverList: List<String>,
 ) {
-    val shape = ContinuousRoundedRectangle(14.dp)
     androidx.compose.foundation.layout.Box(
         modifier = Modifier
-            .fillMaxWidth(0.68f)
-            .widthIn(max = 300.dp)
+            .fillMaxWidth()
+            // The list retains its song-row margins; only the hero reaches the page edges.
+            .layout { measurable, constraints ->
+                val inset = 16.dp.roundToPx()
+                val placeable = measurable.measure(constraints.copy(
+                    minWidth = constraints.maxWidth + inset * 2,
+                    maxWidth = constraints.maxWidth + inset * 2,
+                ))
+                layout(constraints.maxWidth, placeable.height) { placeable.placeRelative(-inset, 0) }
+            }
             .aspectRatio(1f)
-            .dropShadow(
-                shape = shape,
-                shadow = Shadow(
-                    radius = 18.dp,
-                    color = Color.Black.copy(alpha = 0.16f),
-                    offset = DpOffset.Zero,
-                ),
-            )
-            .clip(shape),
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        0f to Color.Black,
+                        0.45f to Color.Black,
+                        0.70f to Color.Black.copy(alpha = 0.45f),
+                        1f to Color.Transparent,
+                    ),
+                    blendMode = BlendMode.DstIn,
+                )
+            },
     ) {
         when (style) {
             PlaylistCoverStyle.Cover -> AsyncImage(

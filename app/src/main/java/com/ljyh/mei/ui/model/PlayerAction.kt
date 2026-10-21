@@ -14,6 +14,7 @@ enum class PlayerAction(
     SLEEP_TIMER("sleep", R.string.more_action_sleep_timer, "moon"),
     ADD_TO_PLAYLIST("add", R.string.more_action_add_playlist, "text.badge.plus"),
     DOWNLOAD("download", R.string.more_action_download, "arrow.down.circle"),
+    COMMENTS("comment", R.string.more_action_comments, "bubble.left"),
     MORE("more", R.string.more_actions_title, "ellipsis"),
     ;
 
@@ -39,6 +40,14 @@ enum class PlayerAction(
             return toSettings(base + MORE)
         }
 
-        val defaultActions = listOf(PLAY_MODE, QUEUE, LYRICS, MORE)
+        /** Fill spare slots on existing toolbars while respecting a full custom configuration. */
+        fun migrateMissingComments(settingString: String): String? {
+            val actions = fromSettings(settingString)
+            if (COMMENTS in actions || actions.size >= MAX_VISIBLE) return null
+            val index = actions.indexOf(MORE).takeIf { it >= 0 } ?: actions.size
+            return toSettings(actions.toMutableList().apply { add(index, COMMENTS) })
+        }
+
+        val defaultActions = listOf(PLAY_MODE, QUEUE, LYRICS, COMMENTS, MORE)
     }
 }

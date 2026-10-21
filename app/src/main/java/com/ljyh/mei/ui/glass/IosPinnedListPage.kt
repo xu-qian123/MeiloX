@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -246,6 +247,7 @@ fun IosPinnedListPage(
     title: String,
     bottomPadding: Dp,
     horizontalContentPadding: Dp = 16.dp,
+    overlapTopBar: Boolean = false,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     listState: LazyListState = rememberLazyListState(),
@@ -258,10 +260,12 @@ fun IosPinnedListPage(
     backgroundBrush: Brush? = null,
     content: LazyListScope.() -> Unit,
 ) {
-    val collapseDistancePx = with(LocalDensity.current) { 56.dp.toPx() }
-    val collapseProgress by remember(listState, showsLargeTitle) {
+    val collapseDistancePx = if (overlapTopBar) {
+        LocalWindowInfo.current.containerSize.width * 0.6f
+    } else with(LocalDensity.current) { 56.dp.toPx() }
+    val collapseProgress by remember(listState, showsLargeTitle, overlapTopBar, collapseDistancePx) {
         derivedStateOf {
-            if (!showsLargeTitle) {
+            if (!showsLargeTitle && !overlapTopBar) {
                 1f
             } else if (listState.firstVisibleItemIndex > 0) {
                 1f
@@ -286,7 +290,7 @@ fun IosPinnedListPage(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = horizontalContentPadding,
-                top = contentPadding.calculateTopPadding(),
+                top = if (overlapTopBar) 0.dp else contentPadding.calculateTopPadding(),
                 end = horizontalContentPadding,
                 bottom = contentPadding.calculateBottomPadding(),
             ),

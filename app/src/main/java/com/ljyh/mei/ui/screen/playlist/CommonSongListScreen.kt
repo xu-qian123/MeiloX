@@ -157,6 +157,7 @@ fun CommonSongListScreen(
                     !isPlaylistSearchActive && it.isNotBlank()
                 },
                 showsLargeTitle = false,
+                overlapTopBar = true,
                 listState = listState,
                 backgroundColor = coverBackground.color,
                 backgroundBrush = coverBackground.brush.takeIf { useCoverBackground },

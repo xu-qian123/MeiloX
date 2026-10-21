@@ -7,6 +7,9 @@ import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.pager.rememberPagerState
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
@@ -45,12 +48,26 @@ fun ClassicPlayer(
 ) {
 
     val device = rememberDeviceInfo()
+    val phonePagerState = rememberPagerState(pageCount = { 2 })
+    val scope = rememberCoroutineScope()
+    val layoutMode = when {
+        device.isTablet && device.isLandscape -> PlayerLayoutMode.Tablet
+        !device.isTablet && device.isLandscape -> PlayerLayoutMode.ImmersiveLandscape
+        else -> PlayerLayoutMode.PhonePortrait
+    }
 
     // --- 从状态容器获取数据 ---
     val mediaMetadata by stateContainer.mediaMetadata
     val isPlaying by stateContainer.isPlaying
     BottomSheet(
         state = state,
+        onBack = {
+            if (layoutMode == PlayerLayoutMode.PhonePortrait && phonePagerState.currentPage != 0) {
+                scope.launch { phonePagerState.animateScrollToPage(0) }
+            } else {
+                state.collapseSoft()
+            }
+        },
         modifier = modifier,
         collapsedDragOffset = miniPlayerVerticalOffset,
         collapsedDragHeight = MiniPlayerHeight,
@@ -92,17 +109,12 @@ fun ClassicPlayer(
                 .layerBackdrop(playerContentBackdrop)
                 .trackBackdropPosition(playerContentBackdrop),
         ) {
-            val layoutMode = when {
-                device.isTablet && device.isLandscape -> PlayerLayoutMode.Tablet
-                !device.isTablet && device.isLandscape -> PlayerLayoutMode.ImmersiveLandscape
-                else -> PlayerLayoutMode.PhonePortrait
-            }
 
 //            Timber.tag("PlayerLayoutMode").d(layoutMode.name)
 
 
             when (layoutMode) {
-                PlayerLayoutMode.PhonePortrait -> ClassicPhoneLayout(stateContainer, overlayHandler)
+                PlayerLayoutMode.PhonePortrait -> ClassicPhoneLayout(stateContainer, overlayHandler, phonePagerState)
                 PlayerLayoutMode.Tablet -> ClassicTabletLayout(stateContainer, overlayHandler)
                 PlayerLayoutMode.ImmersiveLandscape -> ClassicImmersiveLayout(stateContainer, overlayHandler)
             }

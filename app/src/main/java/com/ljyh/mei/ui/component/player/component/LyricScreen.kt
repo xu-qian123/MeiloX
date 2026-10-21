@@ -464,7 +464,7 @@ private fun LyricSecondaryLinePill(
     val shape = ContinuousRoundedRectangle(24.dp)
     val tint = if (active) Color.Black.copy(alpha = .85f) else Color.White.copy(alpha = .65f)
     Box(
-        modifier.size(48.dp).clip(shape)
+        modifier.size(48.dp).padding(4.dp).clip(shape)
             .background(if (active) Color.White else Color.White.copy(alpha = .10f))
             .border(.5.dp, Color.White.copy(alpha = .14f), shape)
             .semantics(mergeDescendants = true) {
@@ -477,9 +477,9 @@ private fun LyricSecondaryLinePill(
         contentAlignment = Alignment.Center,
     ) {
         if (mode == LyricsSecondaryLineMode.PHONETIC) {
-            Text("ā", color = tint, fontSize = 27.sp, fontWeight = FontWeight.Medium)
+            Text("ā", color = tint, fontSize = 23.sp, fontWeight = FontWeight.Medium)
         } else {
-            SfIcon("translate", contentDescription = null, size = 23.dp, tint = tint)
+            SfIcon("translate", contentDescription = null, size = 20.dp, tint = tint)
         }
     }
 }
@@ -559,7 +559,7 @@ private fun LyricSourceBadge(
     val description = stringResource(R.string.lyrics_source_control, sourceName)
     val shape = ContinuousRoundedRectangle(24.dp)
     Box(
-        modifier.size(48.dp).clip(shape)
+        modifier.size(48.dp).padding(4.dp).clip(shape)
             .background(Color.White.copy(alpha = .12f))
             .border(.5.dp, Color.White.copy(alpha = .14f), shape)
             .semantics { contentDescription = description }
@@ -574,17 +574,17 @@ private fun LyricSourceBadge(
                     else -> R.drawable.am
                 }),
                 contentDescription = null,
-                modifier = Modifier.size(24.dp),
+                modifier = Modifier.size(20.dp),
                 tint = Color.White.copy(alpha = .9f),
             )
-            LyricSource.Kugou -> Text("K", color = Color.White, fontSize = 23.sp, fontWeight = FontWeight.Bold)
+            LyricSource.Kugou -> Text("K", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             else -> SfIcon(
                 when (source) {
                     LyricSource.Custom -> "square.and.pencil"
                     LyricSource.Loading -> "ellipsis"
                     else -> "quote.bubble"
                 },
-                contentDescription = null, size = 22.dp, tint = Color.White.copy(alpha = .9f),
+                contentDescription = null, size = 20.dp, tint = Color.White.copy(alpha = .9f),
             )
         }
     }

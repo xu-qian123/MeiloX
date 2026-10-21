@@ -428,6 +428,7 @@ fun BottomSheet(
     transitionBackdrop: Backdrop,
     onDismiss: (() -> Unit)? = null,
     onHorizontalSwipe: ((HorizontalSwipeDirection) -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
     backgroundContent: @Composable BoxScope.() -> Unit = {},
     collapsedContent: @Composable BoxScope.() -> Unit,
     content: @Composable BoxScope.() -> Unit,
@@ -448,7 +449,10 @@ fun BottomSheet(
     )
     val expandedCornerRadius = rememberPlayerScreenCornerRadius(layers.hostBounds)
     SideEffect { layers.updateFrozenBounds() }
-    BackHandler(enabled = !collapsed && !dismissed, onBack = state::collapseSoft)
+    BackHandler(
+        enabled = !collapsed && !dismissed,
+        onBack = onBack ?: state::collapseSoft,
+    )
 
     Box(modifier.fillMaxSize().onGloballyPositioned { layers.updateHost(it.boundsInRoot()) }) {
         if (!dismissed || onDismiss == null) {

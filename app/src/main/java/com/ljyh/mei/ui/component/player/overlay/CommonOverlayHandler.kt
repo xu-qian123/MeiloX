@@ -48,12 +48,13 @@ import timber.log.Timber
  * 统一渲染所有弹窗组件，提取约150行重复代码
  */
 @UnstableApi
+@kotlin.OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun CommonOverlayHandler(
     overlayHandler: PlayerOverlayHandler,
     stateContainer: PlayerStateContainer,
     sheetState: BottomSheetState? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val navController = LocalNavController.current
@@ -61,6 +62,18 @@ fun CommonOverlayHandler(
 
     when (val overlay = overlayHandler.currentOverlayValue) {
         OverlayState.None -> {}
+
+        is OverlayState.Comments -> {
+            PlayerPageOverlay(
+                initialRoute = "${Screen.Comment.route}/${overlay.songId}",
+                onDismiss = overlayHandler::dismiss,
+            ) { route ->
+                com.ljyh.mei.ui.screen.navigationEntry(
+                    route = route,
+                    scrollBehavior = androidx.compose.material3.TopAppBarDefaults.pinnedScrollBehavior(),
+                )
+            }
+        }
 
         OverlayState.Playlist -> {
             PlaylistBottomSheet(
@@ -166,11 +179,13 @@ fun CommonOverlayHandler(
                     if (action == MoreAction.COMMENT || action == MoreAction.SONG_WIKI) {
                         stateContainer.mediaMetadata.value?.let { v->
                             val destination = if (action == MoreAction.COMMENT) Screen.Comment else Screen.SongWiki
-                            destination.navigate(navController) {
-                                addPath(v.id.toString())
+                            if (action == MoreAction.COMMENT) {
+                                overlayHandler.showComments(v.id.toString())
+                            } else {
+                                overlayHandler.dismiss()
+                                navController.navigate("${destination.route}/${v.id}")
+                                sheetState?.collapse(spring(stiffness = Spring.StiffnessVeryLow))
                             }
-                            overlayHandler.dismiss()
-                            sheetState?.collapse(spring(stiffness = Spring.StiffnessVeryLow))
                         }
 
                     }else{

@@ -79,6 +79,10 @@ class PlayerOverlayHandler(
         _currentOverlay.value = OverlayState.MoreAction
     }
 
+    fun showComments(songId: String) {
+        _currentOverlay.value = OverlayState.Comments(songId)
+    }
+
     /**
      * 显示底部设置弹窗
      */

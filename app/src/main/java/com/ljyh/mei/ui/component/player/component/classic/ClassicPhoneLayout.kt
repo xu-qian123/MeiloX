@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -59,6 +60,7 @@ import kotlinx.coroutines.launch
 fun ClassicPhoneLayout(
     stateContainer: PlayerStateContainer,
     overlayHandler: PlayerOverlayHandler,
+    pagerState: PagerState = rememberPagerState(pageCount = { 2 }),
 ) {
 
 
@@ -108,7 +110,6 @@ fun ClassicPhoneLayout(
         }
 
         // Pager (Cover / Lyrics)
-        val pagerState = rememberPagerState(pageCount = { 2 })
         HorizontalPager(
             state = pagerState,
             modifier = Modifier
@@ -243,6 +244,9 @@ fun ClassicPhoneLayout(
             },
             onDownloadClick = {
                 overlayHandler.handleMoreAction(com.ljyh.mei.ui.model.MoreAction.DOWNLOAD)
+            },
+            onCommentClick = {
+                mediaMetadata?.let { overlayHandler.showComments(it.id.toString()) }
             },
             onMoreClick = {
                 overlayHandler.showMoreAction()

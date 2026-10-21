@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -519,7 +520,8 @@ private fun ArtistHeader(
             }
             GlassButton(
                 onClick = onPlayHotSongs,
-                modifier = Modifier.semantics { contentDescription = playHotSongsLabel },
+                modifier = Modifier.widthIn(min = 128.dp)
+                    .semantics { contentDescription = playHotSongsLabel },
                 style = GlassSurfaceStyle.Navigation,
                 enabled = canPlayHotSongs,
                 emphasis = GlassEmphasis.Prominent,

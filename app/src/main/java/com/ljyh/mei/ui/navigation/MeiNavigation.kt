@@ -22,6 +22,7 @@ class MeiNavBackStackEntry(
 class MeiNavigator(
     val context: Context,
     val backStack: NavBackStack<NavKey>,
+    private val onRootBack: (() -> Boolean)? = null,
 ) {
     private val savedStateHandles = mutableMapOf<String, SavedStateHandle>()
 
@@ -60,7 +61,7 @@ class MeiNavigator(
     }
 
     fun popBackStack(): Boolean {
-        if (backStack.size <= 1) return false
+        if (backStack.size <= 1) return onRootBack?.invoke() ?: false
         recordTransition((backStack.getOrNull(backStack.lastIndex - 1) as? MeiRoute)?.route)
         // Kotlin 2.3 may lower MutableList.removeLast() to the Java 21 API.
         // Android 14 does not expose that interface method yet.

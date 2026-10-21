@@ -52,6 +52,7 @@ fun PlayerActionToolbar(
     onSleepTimerClick: () -> Unit,
     onAddToPlaylistClick: () -> Unit,
     onDownloadClick: () -> Unit,
+    onCommentClick: () -> Unit,
     onMoreClick: () -> Unit
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
@@ -63,7 +64,8 @@ fun PlayerActionToolbar(
     )
     // 「更多」从标题栏移到功能栏后，旧配置缺少它时自动补一次。
     LaunchedEffect(actionString) {
-        PlayerAction.migrateMissingMore(actionString)?.let { setActionString(it) }
+        (PlayerAction.migrateMissingMore(actionString)
+            ?: PlayerAction.migrateMissingComments(actionString))?.let { setActionString(it) }
     }
     val actions = remember(actionString) {
         val actions = PlayerAction.fromSettings(actionString)
@@ -176,6 +178,12 @@ fun PlayerActionToolbar(
                     ShadowedIconButton(
                         onClick = onDownloadClick,
                     ) {
+                        SfIcon(action.systemName, stringResource(action.labelRes), tint = Color.White)
+                    }
+                }
+
+                PlayerAction.COMMENTS -> {
+                    ShadowedIconButton(onClick = onCommentClick) {
                         SfIcon(action.systemName, stringResource(action.labelRes), tint = Color.White)
                     }
                 }

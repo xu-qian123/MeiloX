@@ -91,6 +91,7 @@ fun EveryDay(
         }
     } else {
         CommonSongListScreen(
+            useCoverBackground = true,
             uiData = displayedUiData,
             pagingItems = null,
             isLoading = isLoading,

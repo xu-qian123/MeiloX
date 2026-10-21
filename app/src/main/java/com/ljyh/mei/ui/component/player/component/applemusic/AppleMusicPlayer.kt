@@ -2,7 +2,6 @@ package com.ljyh.mei.ui.component.player.component.applemusic
 
 import android.content.res.Configuration
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
@@ -47,6 +46,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
@@ -115,7 +115,7 @@ fun AppleMusicPlayer(
     val configuration = LocalConfiguration.current
 
     // --- Apple Music 特定状态 ---
-    var showLyrics by remember { mutableStateOf(false) }
+    var showLyrics by rememberSaveable { mutableStateOf(false) }
     var playerBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 
     // --- 从状态容器获取数据 ---
@@ -134,9 +134,6 @@ fun AppleMusicPlayer(
     )
 
     // --- Apple Music 特定的 LaunchedEffect ---
-    BackHandler(enabled = sheetExpanded && showLyrics) {
-        showLyrics = false
-    }
 
 
     // --- Animation & Geometry Calculation ---
@@ -222,6 +219,9 @@ fun AppleMusicPlayer(
         // --- 3. UI Structure ---
         BottomSheet(
             state = state,
+            onBack = {
+                if (showLyrics) showLyrics = false else state.collapseSoft()
+            },
             modifier = Modifier.fillMaxSize(),
             collapsedDragOffset = miniPlayerVerticalOffset,
             collapsedDragHeight = MiniPlayerHeight,
@@ -443,6 +443,9 @@ fun AppleMusicPlayer(
                                 },
                                 onDownloadClick = {
                                     overlayHandler.handleMoreAction(com.ljyh.mei.ui.model.MoreAction.DOWNLOAD)
+                                },
+                                onCommentClick = {
+                                    mediaMetadata?.let { overlayHandler.showComments(it.id.toString()) }
                                 },
                                 onMoreClick = { overlayHandler.showMoreAction() },
                                 isCompact = isCompactHeight || isLandscape,
