@@ -6,6 +6,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.ljyh.mei.BuildConfig
 import com.ljyh.mei.constants.UserAgent
+import com.ljyh.mei.constants.UpdateRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -34,7 +35,7 @@ sealed interface VersionUpdateResult {
 
 /** Checks GitHub tags or downloadable main-branch CI builds off the Compose thread. */
 object VersionUpdateChecker {
-    private const val Repository = "NEORUAA/MeiloX"
+    private const val Repository = UpdateRepository
     private const val RepositoryUrl = "https://github.com/$Repository"
     private const val ApiUrl = "https://api.github.com/repos/$Repository"
     private const val TagsEndpoint = "$ApiUrl/tags?per_page=100"

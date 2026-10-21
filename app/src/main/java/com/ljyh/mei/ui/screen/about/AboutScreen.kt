@@ -41,6 +41,7 @@ import com.ljyh.mei.R
 import com.ljyh.mei.constants.BetaUpdatesEnabledKey
 import com.ljyh.mei.constants.DevModeKey
 import com.ljyh.mei.constants.Github
+import com.ljyh.mei.constants.UpdateRepository
 import com.ljyh.mei.ui.glass.GlassCard
 import com.ljyh.mei.ui.glass.GlassIconButton
 import com.ljyh.mei.ui.glass.GlassToggle
@@ -157,7 +158,7 @@ fun AboutScreen(viewModel: AboutViewModel = hiltViewModel()) {
                     } else {
                         stringResource(R.string.about_check_updates)
                     },
-//                    stringResource(R.string.about_check_updates_description),
+                    subtitle = UpdateRepository,
                 ) { checkForUpdates() }
                 GlassCard(
                     Modifier.fillMaxWidth(),

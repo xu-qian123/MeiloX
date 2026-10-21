@@ -13,6 +13,22 @@ import org.junit.Test
 
 class VersionUpdateCheckerTest {
     @Test
+    fun upstreamBetaBuildsAreNotOfferedByTheFork() = runBlocking {
+        val requests = mutableListOf<String>()
+        val upstreamRuns = JsonParser.parseString(
+            runs(run(35)).toString().replace("xu-qian123/MeiloX", "NEORUAA/MeiloX"),
+        )
+        val result = VersionUpdateChecker.checkWithFetcher("1.55.0", true, ciBuild(34)) { url ->
+            requests += url
+            upstreamRuns
+        }
+        assertEquals(VersionUpdateResult.Failed, result)
+        assertEquals(1, requests.size)
+        assertTrue(requests.single().startsWith("https://api.github.com/repos/xu-qian123/MeiloX/"))
+        assertFalse(requests.any { "/artifacts" in it })
+    }
+
+    @Test
     fun betaUsesBuildNumberEvenWhenVersionNameHasNotChanged() = runBlocking {
         val requests = mutableListOf<String>()
         val result = checkBeta(
@@ -24,9 +40,10 @@ class VersionUpdateCheckerTest {
 
         assertEquals("beta #35.1", result.latestTag)
         assertEquals("beta #34.1", result.currentBuildLabel)
-        assertEquals("https://github.com/NEORUAA/MeiloX/actions/runs/1035#artifacts", result.releaseUrl)
+        assertEquals("https://github.com/xu-qian123/MeiloX/actions/runs/1035#artifacts", result.releaseUrl)
         assertTrue(result.isBeta)
         assertEquals(2, requests.size)
+        assertTrue(requests.all { it.startsWith("https://api.github.com/repos/xu-qian123/MeiloX/") })
         assertTrue(requests.first().contains("/workflows/main.yml/runs?branch=main&status=success"))
         assertFalse(requests.any { "/tags" in it })
     }
@@ -214,10 +231,10 @@ class VersionUpdateCheckerTest {
         } as VersionUpdateResult.UpdateAvailable
 
         assertEquals("v1.54.7", result.latestTag)
-        assertEquals("https://github.com/NEORUAA/MeiloX/releases/tag/v1.54.7", result.releaseUrl)
+        assertEquals("https://github.com/xu-qian123/MeiloX/releases/tag/v1.54.7", result.releaseUrl)
         assertFalse(result.isBeta)
         assertEquals(null, result.currentBuildLabel)
-        assertEquals(listOf("https://api.github.com/repos/NEORUAA/MeiloX/tags?per_page=100"), requests)
+        assertEquals(listOf("https://api.github.com/repos/xu-qian123/MeiloX/tags?per_page=100"), requests)
         assertEquals(
             VersionUpdateResult.UpToDate,
             VersionUpdateChecker.checkWithFetcher("1.54.7", false, localBuild()) { tags },
@@ -266,7 +283,7 @@ class VersionUpdateCheckerTest {
         assertTrue(result.isBeta)
         assertEquals(3, requests.size)
         assertEquals(
-            "https://api.github.com/repos/NEORUAA/MeiloX/compare/" +
+            "https://api.github.com/repos/xu-qian123/MeiloX/compare/" +
                 "${installed.commitSha}...${commitSha(35)}?per_page=1",
             requests.last(),
         )
@@ -300,7 +317,7 @@ class VersionUpdateCheckerTest {
 
         assertFalse(result.comparisonKnown)
         assertEquals("beta #35.1", result.latestTag)
-        assertEquals("https://github.com/NEORUAA/MeiloX/actions/runs/1035#artifacts", result.releaseUrl)
+        assertEquals("https://github.com/xu-qian123/MeiloX/actions/runs/1035#artifacts", result.releaseUrl)
     }
 
     @Test
@@ -440,13 +457,13 @@ class VersionUpdateCheckerTest {
         status: String = "completed",
         conclusion: String = "success",
         path: String = ".github/workflows/main.yml",
-        headRepository: String = "NEORUAA/MeiloX",
+        headRepository: String = "xu-qian123/MeiloX",
         event: String = "push",
     ): String = """{
         "id":${1000 + number}, "run_number":$number, "run_attempt":$attempt,
         "head_branch":"$branch", "head_sha":"${commitSha(number)}", "path":"$path",
         "status":"$status", "conclusion":"$conclusion", "event":"$event",
-        "repository":{"id":123,"full_name":"NEORUAA/MeiloX"},
+        "repository":{"id":123,"full_name":"xu-qian123/MeiloX"},
         "head_repository":{"id":123,"full_name":"$headRepository"}
     }"""
 
