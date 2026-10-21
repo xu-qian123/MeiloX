@@ -1,6 +1,7 @@
 package com.ljyh.mei.data.network.netease
 
 import com.github.luben.zstd.Zstd
+import java.io.IOException
 import java.math.BigInteger
 import java.security.SecureRandom
 
@@ -114,7 +115,7 @@ internal object NcblCodec {
         return output
     }
 
-    private fun compressZstd(input: ByteArray): ByteArray = Zstd.compress(input)
+    private fun compressZstd(input: ByteArray): ByteArray = compressNcblBody(input)
 
     private fun rsaWrap(keyA: ByteArray): ByteArray {
         val value = BigInteger(1, keyA)
@@ -185,4 +186,14 @@ internal object NcblCodec {
         bytes[offset + 2] = (value ushr 16).toByte()
         bytes[offset + 3] = (value ushr 24).toByte()
     }
+}
+
+/** Optional history reporting must not terminate playback if its native codec cannot load. */
+internal fun compressNcblBody(
+    input: ByteArray,
+    compressor: (ByteArray) -> ByteArray = { Zstd.compress(it) },
+): ByteArray = try {
+    compressor(input)
+} catch (error: LinkageError) {
+    throw IOException("NCBL compression library is unavailable", error)
 }

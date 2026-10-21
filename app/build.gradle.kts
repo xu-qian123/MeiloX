@@ -221,7 +221,8 @@ dependencies {
     implementation(libs.annotations)
     implementation(libs.androidx.core.animation)
     implementation(libs.androidx.compose.material3.window.size.class1)
-    implementation(libs.zstd.jni)
+    // Android needs the AAR's JNI libraries; the default JAR contains desktop binaries.
+    implementation("${libs.zstd.jni.get()}@aar")
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
     testRuntimeOnly(libs.zstd.jni)

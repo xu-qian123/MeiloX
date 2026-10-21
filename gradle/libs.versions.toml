@@ -23,7 +23,8 @@ lifecycleRuntimeKtx = "2.11.0"
 activityCompose = "1.13.0"
 composeBom = "2026.09.00"
 loggingInterceptor = "5.5.0"
-lyricsCoreVersion = "0.5.0"
+# lyrics-ui 1.0.19 calls the 0.4.5 KaraokeSyllable ABI; upgrade this pair together.
+lyricsCoreVersion = { strictly = "0.4.5" }
 lyricsUiVersion = "1.0.19"
 tinyPinyinVersion = "2.0.3.RELEASE"
 material3Android = "1.4.0"
