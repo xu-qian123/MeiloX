@@ -31,6 +31,10 @@ jobs:
       - name: Verify with the repository Wrapper
         run: ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --continue --console=plain
 
+      - name: Check packaged native libraries for 16 KB pages
+        if: always() && !cancelled()
+        run: python3 scripts/verify_native_page_size.py app/build/outputs/apk/debug/app-debug.apk --json-output app/build/reports/native-page-size-debug.json
+
       - name: Upload verification reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -40,6 +44,7 @@ jobs:
             app/build/reports/tests/
             app/build/test-results/
             app/build/reports/lint-results-debug.*
+            app/build/reports/native-page-size-debug.json
           if-no-files-found: warn
 
   build:
@@ -67,6 +72,9 @@ jobs:
           -Pmei.buildCommitSha=${{ github.sha }}
           -Pmei.ciRunNumber=${{ github.run_number }}
           -Pmei.ciRunAttempt=${{ github.run_attempt }}
+
+      - name: Check release native libraries for 16 KB pages
+        run: python3 scripts/verify_native_page_size.py app/build/outputs/apk/release/app-release.apk --json-output app/build/reports/native-page-size-release.json
 
       - uses: r0adkll/sign-android-release@v1
         id: sign_app

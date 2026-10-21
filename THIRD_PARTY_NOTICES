@@ -1,6 +1,16 @@
 Third-Party Notices
 ===================
 
+LLVM C++ runtime
+----------------
+The ARM64 `libc++_shared.so` is from Android NDK r28c (28.2.13676358),
+stripped with that NDK's `llvm-strip --strip-unneeded` without modifying
+its runtime code. It replaces the older bundled runtime to support
+16 KB memory pages. The LLVM Project uses the Apache License 2.0 with
+LLVM Exceptions and the additional notices preserved in
+`third_party/licenses/llvm-libcxx-LICENSE.txt`.
+Source: https://github.com/llvm/llvm-project/tree/llvmorg-19.1.7/libcxx
+
 Chaoge (朝歌) is distributed under the GNU General Public License, version 3 (see
 LICENSE). The components below remain under their own terms. This file is a
 notice and does not replace any upstream license text.
